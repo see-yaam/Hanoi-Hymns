@@ -25,7 +25,7 @@ export class Controls {
     $('#in-root').innerHTML = NOTE_NAMES.map((n, i) => `<option value="${i}">${n}</option>`).join('');
     $('#in-voicing').innerHTML = Object.entries(VOICINGS).map(([k, v]) => `<option value="${k}">${v.label.split(' — ')[0]}</option>`).join('');
     $('#presets').innerHTML = Object.entries(PRESETS)
-      .map(([k, p]) => `<button class="preset" data-preset="${k}" aria-pressed="false"><span class="p-icon" aria-hidden="true">${p.icon}</span><span class="p-name">${p.label}</span></button>`)
+      .map(([k, p]) => `<button class="preset" data-preset="${k}" aria-pressed="false"><span class="p-thumb p-thumb--${k}" aria-hidden="true"></span><span class="p-name">${p.label}</span></button>`)
       .join('');
   }
 

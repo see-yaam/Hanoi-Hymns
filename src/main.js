@@ -11,6 +11,9 @@ import { paceBase } from './recursion/composer.js';
 import { Scene } from './visual/scene.js';
 import { StackView } from './visual/stack.js';
 import { Controls } from './ui/controls.js';
+import { renderIcons } from './ui/icons.js';
+
+renderIcons();
 
 const $ = (sel) => document.querySelector(sel);
 const body = document.body;
@@ -52,7 +55,7 @@ const controls = new Controls(initial, (s, changed) => {
   scene.setAtmosphere({ night: s.night, rain: s.rain });
   updateExportNote();
   scheduleHashUpdate();
-  if (changed.includes('preset') && PRESETS[s.preset]) toast(`${PRESETS[s.preset].icon}  ${PRESETS[s.preset].label}`);
+  if (changed.includes('preset') && PRESETS[s.preset]) toast(`Preset: ${PRESETS[s.preset].label}`);
 });
 
 let hashTimer = 0;
@@ -100,7 +103,7 @@ conductor.on((type) => {
     body.classList.toggle('playing', playing);
     $('#btn-play').setAttribute('aria-label', playing ? 'Pause (Space)' : 'Play (Space)');
   }
-  if (type === 'finished') toast('The stones rest on the far rock ✦  Press play to begin again.');
+  if (type === 'finished') toast('The stones rest on the far rock. Press play to begin again.');
 });
 
 const needAudio = () => {
@@ -228,7 +231,7 @@ function updateSleep() {
   const sec = Math.floor((left % 60000) / 1000);
   const txt = `${m}:${String(sec).padStart(2, '0')}`;
   $('#sleep-badge').hidden = false;
-  $('#sleep-badge').textContent = `🌙 sleep in ${txt}`;
+  $('#sleep-text').textContent = `sleep in ${txt}`;
   $('#out-sleep').textContent = txt;
   if (left <= 60000 && !sleepFading && conductor.graph) {
     sleepFading = true;
@@ -241,7 +244,7 @@ function updateSleep() {
     $('#in-sleep').value = '0';
     $('#sleep-badge').hidden = true;
     $('#out-sleep').textContent = '';
-    toast('Sleep well ✦');
+    toast('Sleep well.');
   }
 }
 
@@ -287,7 +290,7 @@ $('#btn-export').addEventListener('click', async () => {
       prog.setAttribute('aria-valuenow', String(Math.round(f * 100)));
     });
     downloadBlob(blob, exportFilename(s));
-    toast('Your soundscape is ready ✦');
+    toast('Your soundscape is ready.');
   } catch (err) {
     console.error(err);
     toast('Export failed — please try fewer stones or a faster pace.');

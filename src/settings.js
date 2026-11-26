@@ -46,22 +46,18 @@ export const DEFAULTS = {
 export const PRESETS = {
   'morning-mist': {
     label: 'Morning Mist',
-    icon: '🌫️',
     values: { n: 5, scale: 'pentatonic', root: 2, pace: 'slow', voicing: 'classic', echo: 0.55, seed: 108, rain: 0, river: 0.5, wind: 0.25, drone: 0.45, night: 0.1 },
   },
   'monsoon-evening': {
     label: 'Monsoon Evening',
-    icon: '🌧️',
     values: { n: 6, scale: 'bhupali', root: 4, pace: 'medium', voicing: 'garden', echo: 0.6, seed: 1971, rain: 0.7, river: 0.3, wind: 0.15, drone: 0.5, night: 0.4 },
   },
   'temple-night': {
     label: 'Temple Night',
-    icon: '🏮',
     values: { n: 7, scale: 'hirajoshi', root: 9, pace: 'slow', voicing: 'temple', echo: 0.75, seed: 777, rain: 0, river: 0.15, wind: 0.35, drone: 0.55, night: 0.75 },
   },
   'deep-sleep': {
     label: 'Deep Sleep',
-    icon: '🌙',
     values: { n: 8, scale: 'dorian', root: 5, pace: 'slow', voicing: 'dream', echo: 0.85, seed: 4242, rain: 0.3, river: 0.4, wind: 0.1, drone: 0.6, night: 0.95 },
   },
 };

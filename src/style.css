@@ -61,6 +61,22 @@ kbd {
 button { font: inherit; color: inherit; cursor: pointer; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; border-radius: 10px; }
 
+/* ---------- icon system (Lucide) ---------- */
+.lucide {
+  width: 18px; height: 18px; flex: none;
+  stroke-width: 1.5;
+  color: rgba(185, 168, 224, 0.7);
+  transition: color 0.2s var(--ease), opacity 0.2s var(--ease), transform 0.2s var(--ease);
+  vertical-align: middle;
+}
+button:hover .lucide, button:focus-visible .lucide, button:active .lucide,
+[aria-pressed='true'] .lucide, .field:focus-within .lucide, .switch:hover .lucide,
+.switch:focus-within .lucide { color: var(--amber); }
+.lbl-name { display: inline-flex; align-items: center; gap: 7px; }
+.lbl-name .lucide { width: 16px; height: 16px; }
+kbd .lucide { width: 12px; height: 12px; color: var(--lavender-soft); vertical-align: -1px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
 .ui { transition: opacity 0.9s var(--ease), transform 0.6s var(--ease); }
 body.focus .ui { opacity: 0 !important; pointer-events: none; }
 body.landing-open .ui { opacity: 0; pointer-events: none; }
@@ -74,7 +90,7 @@ body.landing-open .ui { opacity: 0; pointer-events: none; }
 .recursion { position: fixed; left: 20px; top: 92px; width: 286px; padding: 14px 16px 12px; }
 .rec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .recursion.collapsed #rec-body { display: none; }
-.recursion.collapsed .rec-head svg { transform: rotate(180deg); }
+.recursion.collapsed .rec-head .lucide { transform: rotate(180deg); }
 .frames { list-style: none; margin: 0; padding: 0; font-size: 12.5px; min-height: 22px; }
 .frame {
   display: flex; align-items: center; gap: 8px;
@@ -112,11 +128,10 @@ body.panel-open .transport { left: calc((100% - var(--panel-w) - 24px) / 2); }
 .icon-btn:hover { background: rgba(255, 255, 255, 0.08); border-color: var(--glass-border); }
 .icon-btn:active { transform: scale(0.94); }
 .icon-btn.small { width: 30px; height: 30px; }
-.icon-btn svg { width: 20px; height: 20px; fill: none; stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.4s var(--ease); }
-.icon-btn svg .fill { fill: var(--dusk-900); stroke: none; }
-.icon-btn[aria-pressed='true'] { background: rgba(242, 179, 111, 0.16); border-color: rgba(242, 179, 111, 0.4); }
+.icon-btn[aria-pressed='true'] { background: rgba(242, 179, 111, 0.12); border-color: rgba(242, 179, 111, 0.4); }
 .icon-btn.play { width: 54px; height: 54px; background: linear-gradient(135deg, var(--amber-soft), var(--lavender)); box-shadow: 0 4px 24px rgba(242, 179, 111, 0.3); }
-.icon-btn.play svg { width: 22px; height: 22px; stroke: var(--dusk-900); stroke-width: 2.4; }
+/* On the bright play disc the icon stays dark for contrast */
+.icon-btn.play .lucide, .icon-btn.play:hover .lucide, .icon-btn.play:focus-visible .lucide { color: var(--dusk-900); }
 .icon-btn.play .i-pause { display: none; }
 body.playing .icon-btn.play .i-pause { display: block; }
 body.playing .icon-btn.play .i-play { display: none; }
@@ -127,7 +142,6 @@ body.playing .icon-btn.play .i-play { display: none; }
   position: fixed; top: 16px; right: 16px; z-index: 6;
   display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px;
 }
-.panel-toggle svg { width: 18px; height: 18px; fill: none; stroke: var(--text); stroke-width: 1.6; stroke-linecap: round; }
 .panel {
   position: fixed; top: 66px; right: 16px; bottom: 16px; width: var(--panel-w);
   z-index: 5; overflow: hidden; display: flex;
@@ -178,10 +192,37 @@ input[type='range']:focus-visible { outline-offset: 2px; }
 .chip:hover { background: rgba(255, 255, 255, 0.1); }
 .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .preset { text-align: left; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--glass-border); background: rgba(10, 12, 36, 0.35); transition: all 0.35s var(--ease); }
-.preset .p-icon { font-size: 16px; display: block; margin-bottom: 2px; }
-.preset .p-name { font-family: var(--serif); font-size: 16px; }
+.preset { display: flex; align-items: center; gap: 10px; }
+.preset .p-name { font-family: var(--serif); font-size: 16px; line-height: 1.15; }
 .preset:hover { background: rgba(185, 168, 224, 0.14); }
-.preset[aria-pressed='true'] { border-color: rgba(242, 179, 111, 0.6); background: rgba(242, 179, 111, 0.13); }
+.preset[aria-pressed='true'] {
+  border-color: rgba(242, 179, 111, 0.55);
+  background: rgba(242, 179, 111, 0.08);
+  box-shadow: 0 0 0 1px rgba(242, 179, 111, 0.25), 0 0 18px rgba(242, 179, 111, 0.18);
+}
+
+/* ---------- preset mood thumbnails (pure CSS) ---------- */
+.p-thumb {
+  flex: none; position: relative; width: 36px; height: 36px; border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: box-shadow 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.p-thumb::before, .p-thumb::after { content: ''; position: absolute; }
+.preset[aria-pressed='true'] .p-thumb { border-color: rgba(242, 179, 111, 0.7); box-shadow: 0 0 10px rgba(242, 179, 111, 0.45); }
+/* Morning Mist: pale blue to lavender with soft horizontal mist lines */
+.p-thumb--morning-mist { background: linear-gradient(170deg, #cfe0f3 0%, #b9b3e6 60%, #a99ad8 100%); }
+.p-thumb--morning-mist::before { left: 5px; right: 9px; top: 13px; height: 2px; border-radius: 2px; background: rgba(255, 255, 255, 0.8); box-shadow: 5px 6px 0 rgba(255, 255, 255, 0.55), -2px 12px 0 rgba(255, 255, 255, 0.38); filter: blur(0.4px); }
+/* Monsoon Evening: deep teal to slate with thin diagonal rain */
+.p-thumb--monsoon-evening { background: linear-gradient(165deg, #1d5961 0%, #2f4d5a 55%, #3e4a5e 100%); }
+.p-thumb--monsoon-evening::before { inset: -6px; background: repeating-linear-gradient(110deg, transparent 0 5px, rgba(205, 232, 242, 0.42) 5px 6px); }
+/* Temple Night: indigo with a warm amber glow and one glowing lantern dot */
+.p-thumb--temple-night { background: radial-gradient(circle at 50% 78%, rgba(242, 179, 111, 0.85) 0%, rgba(242, 179, 111, 0.25) 32%, transparent 60%), linear-gradient(180deg, #221d5c 0%, #3c3278 100%); }
+.p-thumb--temple-night::before { width: 6px; height: 6px; left: 14px; top: 13px; border-radius: 50%; background: #ffd9a8; box-shadow: 0 0 6px 2px rgba(255, 196, 120, 0.85), 0 0 14px 4px rgba(242, 179, 111, 0.4); }
+/* Deep Sleep: near-black navy with a thin crescent moon */
+.p-thumb--deep-sleep { background: linear-gradient(165deg, #10142e 0%, #070a1a 100%); }
+.p-thumb--deep-sleep::before { width: 14px; height: 14px; left: 12px; top: 9px; border-radius: 50%; box-shadow: -3px 2px 0 0 #ece6ff; transform: rotate(-12deg); filter: drop-shadow(0 0 3px rgba(236, 230, 255, 0.5)); }
+.p-thumb--deep-sleep::after { width: 1.5px; height: 1.5px; left: 26px; top: 25px; border-radius: 50%; background: rgba(236, 230, 255, 0.8); box-shadow: -16px 4px 0 rgba(236, 230, 255, 0.5); }
 
 .switch { display: flex; align-items: center; gap: 10px; margin: 12px 0; cursor: pointer; font-size: 13px; position: relative; }
 .switch input { position: absolute; opacity: 0; width: 36px; height: 20px; margin: 0; cursor: pointer; }
@@ -191,10 +232,12 @@ input[type='range']:focus-visible { outline-offset: 2px; }
 .switch input:checked + .track::after { transform: translateX(16px); background: #fff; }
 .switch input:focus-visible + .track { outline: 2px solid var(--focus); outline-offset: 3px; }
 
-.wide { display: block; width: 100%; margin: 8px 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); text-align: center; transition: background 0.3s var(--ease); }
+.wide { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 8px 0; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); text-align: center; transition: background 0.3s var(--ease); }
 .wide:hover { background: rgba(255, 255, 255, 0.1); }
 .wide.primary { background: linear-gradient(135deg, rgba(242, 179, 111, 0.85), rgba(185, 168, 224, 0.85)); color: var(--dusk-950); font-weight: 600; border: none; }
 .wide.primary:hover { filter: brightness(1.06); }
+/* On the bright export button the icon stays dark for contrast */
+.wide.primary .lucide, .wide.primary:hover .lucide, .wide.primary:focus-visible .lucide { color: var(--dusk-950); opacity: 0.85; }
 .wide:disabled { opacity: 0.5; cursor: progress; }
 
 .keys dl { margin: 0; display: grid; gap: 4px; font-size: 12.5px; }
@@ -267,11 +310,13 @@ body.breathing .breath { opacity: 1; }
 @keyframes breathe { 0%, 100% { transform: scale(0.75); opacity: 0.6; } 50% { transform: scale(1.05); opacity: 1; } }
 
 /* ---------- misc ---------- */
-.focus-exit { position: fixed; top: 16px; right: 16px; z-index: 8; padding: 8px 14px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.8s var(--ease); }
+.focus-exit { position: fixed; top: 16px; right: 16px; z-index: 8; padding: 8px 14px; display: flex; align-items: center; gap: 8px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity 0.8s var(--ease); }
 body.focus .focus-exit.show { opacity: 0.85; pointer-events: auto; }
 .toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -12px); padding: 9px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: all 0.6s var(--ease); z-index: 40; font-size: 13px; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
-.sleep-badge { position: fixed; left: 20px; bottom: max(24px, env(safe-area-inset-bottom)); padding: 7px 14px; border-radius: 999px; font-size: 12px; color: var(--lavender-soft); }
+.sleep-badge { position: fixed; left: 20px; bottom: max(24px, env(safe-area-inset-bottom)); padding: 7px 14px; border-radius: 999px; font-size: 12px; color: var(--lavender-soft); display: flex; align-items: center; gap: 8px; }
+.sleep-badge[hidden] { display: none; }
+.sleep-badge .lucide { width: 16px; height: 16px; }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1100px) {
