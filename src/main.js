@@ -77,17 +77,19 @@ async function begin() {
     const graph = await buildGraph(conductor.settings);
     conductor.attach(graph);
     audioReady = true;
-    fadeMaster(graph, 1, 3);
   } catch (err) {
     console.error(err);
     toast('Audio could not start — the scene will still play silently.');
   }
   $('#landing').classList.add('gone');
   body.classList.remove('landing-open');
-  setPanel(window.innerWidth >= 1100, false);
-  if (audioReady) conductor.play();
+  setPanel(false, false); // the panel starts collapsed: the scene comes first
+  // Ambience is audible within 1 s; the drone + harmony bed swells in over 2 s;
+  // the opening bowl strike (the top-level call) sounds at ≈0.6 s.
+  if (audioReady) conductor.play({ fade: 1 });
   history.replaceState(null, '', toHash(controls.s));
   setTimeout(() => $('#btn-play').focus({ preventScroll: true }), 50);
+  setTimeout(() => toast('Press Space to pause · open the panel to shape your soundscape', 6000), 1800);
 }
 
 $('#begin').addEventListener('click', begin);
@@ -306,12 +308,12 @@ $('#btn-export').addEventListener('click', async () => {
 // ---------------------------------------------------------------- toast
 
 let toastTimer = 0;
-function toast(msg) {
+function toast(msg, ms = 3200) {
   const t = $('#toast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  toastTimer = setTimeout(() => t.classList.remove("show"), ms);
 }
 
 // ---------------------------------------------------------------- keyboard

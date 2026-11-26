@@ -248,12 +248,19 @@ input[type='range']:focus-visible { outline-offset: 2px; }
 /* ---------- landing ---------- */
 .landing {
   position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; text-align: center; padding: 24px;
-  background: radial-gradient(ellipse at 50% 60%, rgba(18, 23, 53, 0.45), rgba(9, 12, 32, 0.85));
+  background: radial-gradient(ellipse at 50% 60%, rgba(10, 13, 34, 0.72), rgba(4, 5, 16, 0.95));
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   transition: opacity 1.6s var(--ease), visibility 0s linear 1.6s;
 }
 .landing.gone { opacity: 0; visibility: hidden; pointer-events: none; }
-.landing-inner { max-width: 560px; animation: rise 2.4s var(--ease) both; }
+.landing-inner { max-width: 560px; }
+/* Dark scene first; then the title, the tagline and the Begin button fade in, one breath apart */
+.landing-inner > * { animation: rise 2.2s var(--ease) both; }
+.landing-inner > .landing-stones { animation-delay: 0.3s; }
+.landing-inner > h1 { animation-duration: 2.8s; animation-delay: 0.6s; }
+.landing-inner > .tagline { animation-delay: 1.6s; }
+.landing-inner > .begin { animation: rise 2.2s var(--ease) 2.3s both, glow 4.5s ease-in-out 4.5s infinite; }
+.landing-inner > .hint { animation-delay: 2.9s; }
 .landing h1 { font-family: var(--serif); font-size: clamp(52px, 9vw, 92px); font-weight: 400; letter-spacing: 0.04em; line-height: 1; }
 .tagline { font-family: var(--serif); font-style: italic; font-size: clamp(18px, 2.6vw, 23px); color: var(--lavender-soft); margin: 18px auto 34px; max-width: 30ch; }
 .begin {
