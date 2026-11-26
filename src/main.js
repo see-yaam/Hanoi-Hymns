@@ -29,7 +29,7 @@ const conductor = new Conductor();
 conductor.load(initial);
 
 const scene = new Scene($('#scene'), conductor);
-scene.setAtmosphere({ night: initial.night, rain: initial.rain });
+scene.setAtmosphere({ night: initial.night, rain: initial.rain, stars: initial.stars });
 scene.night = initial.night;
 scene.setReducedMotion(reducedMQ.matches);
 reducedMQ.addEventListener?.('change', (e) => scene.setReducedMotion(e.matches));
@@ -52,7 +52,7 @@ const controls = new Controls(initial, (s, changed) => {
   if (changed.some((k) => RECOMPOSE_RESET.includes(k))) conductor.load(s, { preserve: false });
   else if (changed.some((k) => RECOMPOSE_KEEP.includes(k))) conductor.load(s, { preserve: true });
   else conductor.update(s);
-  scene.setAtmosphere({ night: s.night, rain: s.rain });
+  scene.setAtmosphere({ night: s.night, rain: s.rain, stars: s.stars });
   updateExportNote();
   scheduleHashUpdate();
   if (changed.includes('preset') && PRESETS[s.preset]) toast(`Preset: ${PRESETS[s.preset].label}`);
@@ -179,6 +179,7 @@ function setBreath(on) {
   breathOn = on;
   breathStart = performance.now();
   body.classList.toggle('breathing', on);
+  scene.breathing = on; // the constellation steps back while the breath guide is shown
   $('#btn-breath').setAttribute('aria-pressed', String(on));
   $('#in-breath').checked = on;
 }

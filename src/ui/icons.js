@@ -25,6 +25,7 @@ import {
   StepBack,
   StepForward,
   Timer,
+  Triangle,
   Volume2,
   Waves,
   Wind,
@@ -33,7 +34,7 @@ import {
 
 const ICONS = {
   ArrowLeft, ArrowRight, AudioWaveform, ChevronUp, CircleDot, CloudRain, Dice5, Download, Info, Link,
-  Maximize, Minimize, Moon, Pause, Play, RotateCcw, SlidersHorizontal, StepBack, StepForward, Timer,
+  Maximize, Minimize, Moon, Pause, Play, RotateCcw, SlidersHorizontal, StepBack, StepForward, Timer, Triangle,
   Volume2, Waves, Wind, X,
 };
 

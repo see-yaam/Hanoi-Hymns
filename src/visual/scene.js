@@ -13,6 +13,7 @@
  */
 import { mulberry32, hashSeed } from '../util/random.js';
 import { VOICINGS } from '../settings.js';
+import { allStates, pathPoints, TRI_ASPECT } from './sierpinski.js';
 
 const TAU = Math.PI * 2;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -58,6 +59,7 @@ export class Scene {
     this.cache = { events: null, count: 0, pegs: null };
     this.lastCompleted = 0;
     this.frameHooks = [];
+    this.tri = { enabled: true, alpha: 1, sprite: null, key: '', pts: [], afterglow: null, doneKey: '' };
 
     const r = mulberry32(hashSeed('sky'));
     this.stars = Array.from({ length: 170 }, () => ({
@@ -78,9 +80,10 @@ export class Scene {
     this.resize();
   }
 
-  setAtmosphere({ night, rain }) {
+  setAtmosphere({ night, rain, stars }) {
     if (night !== undefined) this.nightTarget = night;
     if (rain !== undefined) this.rain = rain;
+    if (stars !== undefined) this.tri.enabled = stars;
   }
   setInset(px) { this.insetTarget = px; }
   setReducedMotion(v) { this.reduced = v; }
@@ -212,6 +215,7 @@ export class Scene {
     } else {
       view = this.snapshot;
     }
+    this.drawConstellation(ctx, L, view, t, dt, this.shownEpoch === cd.epoch);
     this.drawReflections(ctx, L, view, t);
     this.drawRipples(ctx, L, dt);
     this.drawPlatformsAndStones(ctx, L, view, t);
@@ -402,6 +406,122 @@ export class Scene {
     mg.addColorStop(1, rgba(mc, 0));
     ctx.fillStyle = mg;
     ctx.fillRect(0, horizon - H * 0.06, W, H * 0.11);
+  }
+
+  // ------------------------------------------------------------ Sierpinski constellation
+
+  triLayout(L) {
+    const sw = L.W - this.inset;
+    const h = Math.min(L.H * 0.25, sw * 0.3);
+    const w = h / TRI_ASPECT;
+    const top = L.W < 760 ? L.H * 0.2 : L.H * 0.065;
+    return { x0: sw / 2 - w / 2, y0: top, w, h };
+  }
+
+  /** Pre-rendered field of all 3^n states as very dim stars. */
+  triSprite(n, T) {
+    const key = `${n}|${Math.round(T.w)}|${this.dpr}`;
+    if (this.tri.sprite && this.tri.sprite.key === key) return this.tri.sprite;
+    const pad = 6;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil((T.w + pad * 2) * this.dpr);
+    c.height = Math.ceil((T.h + pad * 2) * this.dpr);
+    const g = c.getContext('2d');
+    g.scale(this.dpr, this.dpr);
+    const rad = n <= 3 ? 1.5 : n <= 5 ? 1.1 : n <= 6 ? 0.8 : 0.55;
+    g.fillStyle = `rgba(222, 214, 255, ${n <= 5 ? 0.42 : 0.3})`;
+    for (const [u, v] of allStates(n)) {
+      g.beginPath();
+      g.arc(pad + u * T.w, pad + v * T.h, rad, 0, TAU);
+      g.fill();
+    }
+    this.tri.sprite = { key, canvas: c, pad, w: T.w + pad * 2, h: T.h + pad * 2 };
+    return this.tri.sprite;
+  }
+
+  drawConstellation(ctx, L, view, t, dt, live) {
+    const tri = this.tri;
+    tri.alpha = clamp(tri.alpha + (tri.enabled ? dt / 0.9 : -dt / 0.9), 0, 1);
+    if (tri.alpha <= 0.001) return;
+    const cd = this.conductor;
+    const T = this.triLayout(L);
+    const sp = this.triSprite(L.n, T);
+    const vis = tri.alpha * (0.55 + 0.45 * this.night) * this.alpha * (this.breathing ? 0.45 : 1);
+    ctx.save();
+    ctx.globalAlpha = vis * (this.reduced ? 0.9 : 0.82 + 0.18 * Math.sin(t * 0.21));
+    ctx.drawImage(sp.canvas, T.x0 - sp.pad, T.y0 - sp.pad, sp.w, sp.h);
+    ctx.globalAlpha = 1;
+    const P = ([u, v]) => [T.x0 + u * T.w, T.y0 + v * T.h];
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // Path of the current solve
+    if (live && cd.events.length) {
+      const cur = view.flying ? view.flying.ev : cd.events[Math.max(0, view.completed - 1)];
+      const cycle = view.completed === 0 && !view.flying ? 0 : cur.cycle;
+      const key = `${cd.epoch}|${cycle}|${L.n}|${cd.settings.from}|${cd.settings.to}`;
+      if (tri.key !== key) {
+        const moves = cd.events.filter((e) => e.cycle === cycle);
+        tri.pts = pathPoints(L.n, cd.cyclePegsAt(cycle).from, moves);
+        tri.firstIdx = moves.length ? moves[0].globalIndex : 0;
+        tri.key = key;
+      }
+      const done = clamp(view.completed - tri.firstIdx, 0, tri.pts.length - 1);
+      const pts = tri.pts.map(P);
+      if (done > 0) {
+        ctx.strokeStyle = `rgba(242, 179, 111, ${(0.3 * vis).toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i <= done; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+      }
+      // The head travels with the flying stone and lights up the state it lands on
+      let head = pts[done];
+      let from = done > 0 ? pts[done - 1] : null;
+      if (view.flying && view.flying.ev.cycle === cycle && done + 1 < pts.length) {
+        const e = easeInOutSine(view.flying.u);
+        from = pts[done];
+        head = [lerp(from[0], pts[done + 1][0], e), lerp(from[1], pts[done + 1][1], e)];
+      }
+      if (from) {
+        ctx.strokeStyle = `rgba(255, 210, 150, ${(0.7 * vis).toFixed(3)})`;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(from[0], from[1]);
+        ctx.lineTo(head[0], head[1]);
+        ctx.stroke();
+      }
+      const gr = ctx.createRadialGradient(head[0], head[1], 0, head[0], head[1], 10);
+      gr.addColorStop(0, `rgba(255, 214, 160, ${(0.85 * vis).toFixed(3)})`);
+      gr.addColorStop(0.35, `rgba(242, 179, 111, ${(0.35 * vis).toFixed(3)})`);
+      gr.addColorStop(1, 'rgba(242, 179, 111, 0)');
+      ctx.fillStyle = gr;
+      ctx.fillRect(head[0] - 10, head[1] - 10, 20, 20);
+      // Solve complete: the whole path glows across the fractal, then slowly fades
+      if (done === tri.pts.length - 1 && tri.doneKey !== key) {
+        tri.doneKey = key;
+        tri.afterglow = { pts: tri.pts.slice(), t0: t };
+      }
+    }
+    if (tri.afterglow) {
+      const age = t - tri.afterglow.t0;
+      const k = age < 1.2 ? age / 1.2 : age < 5 ? 1 : Math.max(0, 1 - (age - 5) / 7);
+      if (k <= 0) tri.afterglow = null;
+      else {
+        const pts = tri.afterglow.pts.map(P);
+        for (const [wdt, al] of [[5, 0.12], [1.6, 0.6]]) {
+          ctx.strokeStyle = `rgba(255, 200, 140, ${(al * k * vis).toFixed(3)})`;
+          ctx.lineWidth = wdt;
+          ctx.beginPath();
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   drawReflections(ctx, L, view, t) {

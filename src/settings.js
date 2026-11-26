@@ -34,6 +34,7 @@ export const DEFAULTS = {
   echo: 0.55,
   seed: 108,
   endless: true,
+  stars: true,
   rain: 0,
   river: 0.45,
   wind: 0.2,
@@ -83,13 +84,14 @@ export function sanitize(s) {
   o.volume = clamp(Math.round(+o.volume), 0, 100);
   if (Number.isNaN(o.volume)) o.volume = DEFAULTS.volume;
   o.endless = o.endless === true || o.endless === '1' || o.endless === 1;
+  o.stars = !(o.stars === false || o.stars === "0" || o.stars === 0);
   if (o.preset && !PRESETS[o.preset]) o.preset = 'custom';
   return o;
 }
 
 const HASH_KEYS = {
   n: 'n', scale: 's', root: 'r', pace: 'p', from: 'a', to: 'b', voicing: 'i', echo: 'e',
-  seed: 'seed', endless: 'loop', rain: 'rain', river: 'river', wind: 'wind', drone: 'drone',
+  seed: "seed", endless: "loop", stars: "tri", rain: 'rain', river: 'river', wind: 'wind', drone: 'drone',
   volume: 'v', night: 'sky', preset: 'preset',
 };
 

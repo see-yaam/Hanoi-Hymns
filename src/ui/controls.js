@@ -52,6 +52,7 @@ export class Controls {
     seed.addEventListener('change', () => this.set({ seed: +seed.value }));
     $('#btn-dice').addEventListener('click', () => this.set({ seed: 1 + Math.floor(Math.random() * 99999) }));
     $('#in-endless').addEventListener('change', (e) => this.set({ endless: e.target.checked }));
+    $('#in-stars').addEventListener('change', (e) => this.set({ stars: e.target.checked }));
     $('#presets').addEventListener('click', (e) => {
       const b = e.target.closest('[data-preset]');
       if (b) this.applyPreset(b.dataset.preset);
@@ -68,7 +69,7 @@ export class Controls {
     const prev = this.s;
     const next = sanitize({ ...prev, ...patch, preset: isPreset ? patch.preset : 'custom' });
     // Purely visual/volume tweaks don't break a preset's identity
-    if (!isPreset && Object.keys(patch).every((k) => ['volume', 'night'].includes(k))) next.preset = prev.preset;
+    if (!isPreset && Object.keys(patch).every((k) => ['volume', 'night', 'stars'].includes(k))) next.preset = prev.preset;
     const changed = Object.keys(next).filter((k) => next[k] !== prev[k]);
     if (!changed.length) return;
     this.s = next;
@@ -91,6 +92,7 @@ export class Controls {
     document.querySelectorAll('input[name="pace"]').forEach((r) => { r.checked = r.value === s.pace; });
     $('#in-seed').value = String(s.seed);
     $('#in-endless').checked = s.endless;
+    $('#in-stars').checked = s.stars;
     document.querySelectorAll('.preset').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.preset === s.preset)));
     const map = VOICINGS[s.voicing].map;
     $('#voicing-legend').textContent = map.map((inst, i) => `${PEG_NAMES[i]}: ${INSTRUMENTS[inst]}`).join(' · ');
