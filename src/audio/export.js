@@ -34,7 +34,7 @@ export async function renderWav(settings, onProgress = () => {}) {
   // Tone.Offline exposes no render progress, so estimate it from a measured
   // speed and ease the bar toward 90 % until rendering resolves.
   const started = performance.now();
-  const expectedMs = 1500 + duration * 35;
+  const expectedMs = 1500 + duration * 260; // measured ≈ 3–4× faster than real time
   let rendering = true;
   const timer = setInterval(() => {
     if (!rendering) return;
@@ -44,8 +44,8 @@ export async function renderWav(settings, onProgress = () => {}) {
 
   let buffer;
   try {
-    buffer = await Tone.Offline(async () => {
-      const g = await buildGraph(settings);
+    buffer = await renderOffline(async () => {
+      const g = await buildGraph(settings, { lean: true });
       // Gentle fade in, drone underneath, fade out at the end
       g.fader.gain.setValueAtTime(0, 0);
       g.fader.gain.linearRampToValueAtTime(1, 3);
@@ -67,6 +67,27 @@ export async function renderWav(settings, onProgress = () => {}) {
   const blob = await encodeWav(buffer.get(), (f) => onProgress('Pressing the stones into a file…', 0.9 + 0.1 * f));
   onProgress('Done', 1);
   return blob;
+}
+
+/**
+ * Like Tone.Offline, but renders Tone's offline clock synchronously.
+ * Tone.Offline yields with setTimeout once per simulated second, which browsers
+ * throttle heavily in background tabs — turning a ~10 s render into minutes.
+ */
+async function renderOffline(setup, duration, channels, sampleRate) {
+  const original = Tone.getContext();
+  const context = new Tone.OfflineContext(channels, duration, sampleRate);
+  Tone.setContext(context);
+  let rendering;
+  try {
+    await setup(context);
+    rendering = context.render(false);
+  } finally {
+    Tone.setContext(original);
+  }
+  const buffer = await rendering;
+  try { context.dispose(); } catch (e) { /* ignore */ }
+  return buffer;
 }
 
 /** Encode an AudioBuffer as 16-bit PCM WAV (interleaved), yielding to keep the UI calm. */

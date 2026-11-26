@@ -15,6 +15,7 @@
 import * as Tone from 'tone';
 import { SCALES, VOICINGS, stoneMidi, midiToFreq } from '../settings.js';
 import { paceBase } from '../recursion/composer.js';
+import { mulberry32, hashSeed } from '../util/random.js';
 
 export const PEG_PAN = [-0.55, 0, 0.55];
 
@@ -23,7 +24,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 // ------------------------------------------------------------------ graph
 
-export async function buildGraph(settings) {
+export async function buildGraph(settings, { lean = false } = {}) {
   const ctx = Tone.getContext();
   const g = { ctx };
 
@@ -31,12 +32,14 @@ export async function buildGraph(settings) {
   g.limiter = new Tone.Limiter(-1.5).toDestination();
   g.volume = new Tone.Volume(volumeToDb(settings.volume)).connect(g.limiter);
   g.fader = new Tone.Gain(0).connect(g.volume);
-  g.comp = new Tone.Compressor({ threshold: -20, ratio: 2.5, attack: 0.06, release: 0.5, knee: 12 }).connect(g.fader);
+  g.makeup = new Tone.Gain(Tone.dbToGain(7)).connect(g.fader); // brings the soft mix up before the −10 dB master
+  g.comp = new Tone.Compressor({ threshold: -16, ratio: 2, attack: 0.08, release: 0.6, knee: 10 }).connect(g.makeup);
   g.tone = new Tone.Filter({ type: 'lowpass', frequency: 7200, rolloff: -12, Q: 0.4 }).connect(g.comp);
   g.bus = new Tone.Gain(1).connect(g.tone);
 
   // Reverb (send/return) — long, dark and soft
-  g.reverb = new Tone.Reverb({ decay: 8.5, preDelay: 0.05, wet: 1 });
+  g.reverb = new Tone.Convolver({ normalize: true });
+  g.reverb.buffer = makeImpulse(ctx, 6.5, 0.05);
   g.revIn = new Tone.Gain(1);
   g.revHP = new Tone.Filter({ type: 'highpass', frequency: 160 });
   g.revLP = new Tone.Filter({ type: 'lowpass', frequency: 4200, rolloff: -12 });
@@ -55,14 +58,39 @@ export async function buildGraph(settings) {
   // Peg panners: A left, B centre, C right
   g.pegs = PEG_PAN.map((p) => new Tone.Panner(p).connect(g.bus));
 
-  buildDrone(g, settings);
+  buildDrone(g, settings, lean);
   buildAmbience(g, settings);
 
-  await g.reverb.ready;
   return g;
 }
 
+/**
+ * Seeded, dark, exponentially decaying stereo impulse response.
+ * Generated in JS (fast, no async render) and identical on every run, so the
+ * offline export is bit-for-bit reproducible.
+ */
+function makeImpulse(ctx, decay, preDelay) {
+  const sr = ctx.sampleRate;
+  const len = Math.floor(sr * (decay + preDelay));
+  const buf = ctx.createBuffer(2, len, sr);
+  for (let c = 0; c < 2; c++) {
+    const r = mulberry32(hashSeed('zen-impulse', c));
+    const d = buf.getChannelData(c);
+    let y = 0;
+    for (let i = 0; i < len; i++) {
+      const t = i / sr - preDelay;
+      if (t < 0) { d[i] = 0; continue; }
+      const env = Math.exp((-6.9 * t) / decay) * Math.min(1, t / 0.015);
+      const k = 0.55 - 0.45 * Math.min(1, t / decay); // tail gets darker over time
+      y += k * (r() * 2 - 1 - y);
+      d[i] = y * env;
+    }
+  }
+  return buf;
+}
+
 const feedbackFor = (echo) => 0.16 + 0.42 * echo;
+const DRONE_SCALE = 0.16;
 
 // ------------------------------------------------------------------ drone
 
@@ -73,56 +101,156 @@ function droneFreqs(settings) {
   return { sa, pa: sa * 1.5, sa2: sa * 2 };
 }
 
-function buildDrone(g, settings) {
+// Lightweight raw-node helpers (far cheaper than Tone.LFO / Tone.Noise when rendering offline)
+
+function biquad(ctx, type, frequency, Q = 0.7) {
+  const f = ctx.createBiquadFilter();
+  f.type = type;
+  f.frequency.value = frequency;
+  f.Q.value = Q;
+  return f;
+}
+
+function rawGain(ctx, value) {
+  const gn = ctx.createGain();
+  gn.gain.value = value;
+  return gn;
+}
+
+/** Slow sine LFO sweeping an AudioParam between min and max. */
+function lfo(ctx, param, rate, min, max) {
+  const o = ctx.createOscillator();
+  o.frequency.value = rate;
+  const depth = rawGain(ctx, (max - min) / 2);
+  param.value = (min + max) / 2;
+  o.connect(depth);
+  depth.connect(param);
+  o.start();
+  return o;
+}
+
+/** Seeded looping noise buffer → identical ambience on every render. */
+function noiseBuffer(ctx, type, seed, seconds = 9) {
+  const sr = ctx.sampleRate;
+  const len = Math.floor(sr * seconds);
+  const buf = ctx.createBuffer(1, len, sr);
+  const d = buf.getChannelData(0);
+  const r = mulberry32(hashSeed('noise', type, seed));
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+  for (let i = 0; i < len; i++) {
+    const w = r() * 2 - 1;
+    if (type === 'brown') {
+      last = (last + 0.02 * w) / 1.02;
+      d[i] = last * 3.5;
+    } else {
+      // Paul Kellet's pink-noise filter
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.969 * b2 + w * 0.153852;
+      b3 = 0.8665 * b3 + w * 0.3104856;
+      b4 = 0.55 * b4 + w * 0.5329522;
+      b5 = -0.7616 * b5 - w * 0.016898;
+      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+      b6 = w * 0.115926;
+    }
+  }
+  // Crossfade the tail into the head so the loop point is seamless
+  const fade = Math.floor(sr * 0.25);
+  for (let i = 0; i < fade; i++) {
+    const t = i / fade;
+    d[len - fade + i] = d[len - fade + i] * (1 - t) + d[i] * t;
+  }
+  return buf;
+}
+
+function noise(ctx, type, seed, rate = 1) {
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer(ctx, type, seed);
+  src.loop = true;
+  src.loopStart = 0.25;
+  src.loopEnd = src.buffer.duration;
+  src.playbackRate.value = rate;
+  src.start();
+  return src;
+}
+
+function osc(ctx, type, freq, gain, dest) {
+  const o = ctx.createOscillator();
+  o.type = type;
+  o.frequency.value = freq;
+  const gn = rawGain(ctx, gain);
+  o.connect(gn);
+  gn.connect(dest);
+  o.start();
+  return o;
+}
+
+function buildDrone(g, settings, lean) {
+  const ctx = g.ctx;
   const f = droneFreqs(settings);
-  g.droneLevel = new Tone.Gain(settings.drone * 0.5);
+  const type = SCALES[settings.scale].drone;
+  g.droneLevel = new Tone.Gain(settings.drone * DRONE_SCALE);
   g.droneActive = new Tone.Gain(0);
   g.droneLevel.connect(g.droneActive);
   g.droneActive.connect(g.bus);
   g.droneActive.connect(g.revIn);
+  g.dOsc = [];
+  g.tOsc = [];
 
   // Soft drone: sines on root + fifth, slowly breathing
-  g.droneSoft = new Tone.Gain(SCALES[settings.scale].drone === 'soft' ? 1 : 0).connect(g.droneLevel);
-  const breath = new Tone.Gain(0.16).connect(g.droneSoft);
-  g.droneLfo = new Tone.LFO({ frequency: 0.055, min: 0.09, max: 0.18 }).connect(breath.gain).start();
-  const softLP = new Tone.Filter({ type: 'lowpass', frequency: 420 }).connect(breath);
-  g.dOsc = [
-    new Tone.Oscillator({ frequency: f.sa, type: 'sine', volume: 0 }),
-    new Tone.Oscillator({ frequency: f.pa, type: 'sine', volume: -9 }),
-    new Tone.Oscillator({ frequency: f.sa2, type: 'triangle', volume: -16 }),
-  ];
-  g.dOsc.forEach((o) => o.connect(softLP).start());
+  g.droneSoft = new Tone.Gain(type === 'soft' ? 1 : 0).connect(g.droneLevel);
+  if (!lean || type === 'soft') {
+    const breath = rawGain(ctx, 0.14);
+    Tone.connect(breath, g.droneSoft);
+    lfo(ctx, breath.gain, 0.055, 0.09, 0.18);
+    const softLP = biquad(ctx, 'lowpass', 420);
+    softLP.connect(breath);
+    g.dOsc = [
+      { o: osc(ctx, 'sine', f.sa, 1, softLP), ratio: 1 },
+      { o: osc(ctx, 'sine', f.pa, 0.35, softLP), ratio: 1.5 },
+      { o: osc(ctx, 'triangle', f.sa2, 0.16, softLP), ratio: 2 },
+    ];
+  }
 
   // Tanpura-like drone (Raga mood): buzzy saws through slowly sweeping band-passes
-  g.droneTan = new Tone.Gain(SCALES[settings.scale].drone === 'tanpura' ? 1 : 0).connect(g.droneLevel);
-  const tanLP = new Tone.Filter({ type: 'lowpass', frequency: 1400 }).connect(g.droneTan);
-  g.tOsc = [];
-  const tanSpec = [
-    { f: f.pa, rate: 0.09, vol: -28 },
-    { f: f.sa2, rate: 0.13, vol: -27 },
-    { f: f.sa2 * 1.002, rate: 0.071, vol: -29 },
-    { f: f.sa, rate: 0.05, vol: -24 },
-  ];
-  tanSpec.forEach((s, i) => {
-    const bp = new Tone.Filter({ type: 'bandpass', frequency: s.f * 4, Q: 4 }).connect(tanLP);
-    new Tone.LFO({ frequency: s.rate, min: s.f * 2.5, max: s.f * 9, phase: i * 70 }).connect(bp.frequency).start();
-    const o = new Tone.Oscillator({ frequency: s.f, type: 'sawtooth', volume: s.vol }).connect(bp).start();
-    // Fundamental body under the buzz
-    const body = new Tone.Oscillator({ frequency: s.f, type: 'sine', volume: s.vol + 10 }).connect(tanLP).start();
-    g.tOsc.push({ o, body, ratio: s.f / f.sa });
-  });
+  g.droneTan = new Tone.Gain(type === 'tanpura' ? 1 : 0).connect(g.droneLevel);
+  if (!lean || type === 'tanpura') {
+    const tanLP = biquad(ctx, 'lowpass', 1400);
+    Tone.connect(tanLP, g.droneTan);
+    const spec = [
+      { r: 1.5, rate: 0.09, vol: -28 },
+      { r: 2, rate: 0.13, vol: -27 },
+      { r: 2.004, rate: 0.071, vol: -29 },
+      { r: 1, rate: 0.05, vol: -24 },
+    ];
+    for (const sp of spec) {
+      const fr = f.sa * sp.r;
+      const bp = biquad(ctx, 'bandpass', fr * 4, 4);
+      bp.connect(tanLP);
+      lfo(ctx, bp.frequency, sp.rate, fr * 2.5, fr * 9);
+      g.tOsc.push({ o: osc(ctx, 'sawtooth', fr, Tone.dbToGain(sp.vol), bp), ratio: sp.r });
+      g.tOsc.push({ o: osc(ctx, 'sine', fr, Tone.dbToGain(sp.vol + 10), tanLP), ratio: sp.r }); // body under the buzz
+    }
+  }
 }
 
 // ------------------------------------------------------------------ ambience
 
 function buildAmbience(g, settings) {
+  const ctx = g.ctx;
   // Rain: two decorrelated pink noises spread across the stereo field
   g.rainGain = new Tone.Gain(ambGain('rain', settings.rain)).connect(g.bus);
-  const rainLP = new Tone.Filter({ type: 'lowpass', frequency: 3600, rolloff: -24 }).connect(g.rainGain);
-  const rainHP = new Tone.Filter({ type: 'highpass', frequency: 420 }).connect(rainLP);
-  [-0.7, 0.7].forEach((p) => {
-    const pan = new Tone.Panner(p).connect(rainHP);
-    new Tone.Noise({ type: 'pink', playbackRate: p < 0 ? 1 : 0.97 }).connect(pan).start();
+  const rainHP = biquad(ctx, 'highpass', 420);
+  const rainLP = biquad(ctx, 'lowpass', 3600, 0.5);
+  const rainLP2 = biquad(ctx, 'lowpass', 4200, 0.5);
+  rainHP.connect(rainLP);
+  rainLP.connect(rainLP2);
+  Tone.connect(rainLP2, g.rainGain);
+  [-0.7, 0.7].forEach((p, i) => {
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = p;
+    pan.connect(rainHP);
+    noise(ctx, 'pink', 'rain' + i, 1 - i * 0.03).connect(pan);
   });
   // Droplets bus (individual drops are triggered by the scheduler)
   g.dropBus = new Tone.Gain(1);
@@ -130,27 +258,35 @@ function buildAmbience(g, settings) {
   g.dropRev = new Tone.Gain(0.5).connect(g.revIn);
   g.dropBus.connect(g.dropRev);
 
-  // River: low brown noise with slow filter + level modulation
+  // River: low brown noise, slow filter + level modulation, gently wandering in stereo
   g.riverGain = new Tone.Gain(ambGain('river', settings.river)).connect(g.bus);
-  const riverAmp = new Tone.Gain(0.8).connect(g.riverGain);
-  new Tone.LFO({ frequency: 0.11, min: 0.6, max: 1 }).connect(riverAmp.gain).start();
-  const riverLP = new Tone.Filter({ type: 'lowpass', frequency: 450, Q: 0.8 }).connect(riverAmp);
-  new Tone.LFO({ frequency: 0.06, min: 260, max: 780 }).connect(riverLP.frequency).start();
-  const riverWide = new Tone.AutoPanner({ frequency: 0.03, depth: 0.35 }).connect(riverLP).start();
-  new Tone.Noise({ type: 'brown' }).connect(riverWide).start();
+  const riverAmp = rawGain(ctx, 0.8);
+  Tone.connect(riverAmp, g.riverGain);
+  lfo(ctx, riverAmp.gain, 0.11, 0.6, 1);
+  const riverLP = biquad(ctx, 'lowpass', 450, 0.8);
+  riverLP.connect(riverAmp);
+  lfo(ctx, riverLP.frequency, 0.06, 260, 780);
+  const riverPan = ctx.createStereoPanner();
+  riverPan.connect(riverLP);
+  lfo(ctx, riverPan.pan, 0.03, -0.35, 0.35);
+  noise(ctx, 'brown', 'river').connect(riverPan);
 
   // Wind: band-passed pink noise with a very slow sweep and gusts
   g.windGain = new Tone.Gain(ambGain('wind', settings.wind)).connect(g.bus);
-  const windPan = new Tone.AutoPanner({ frequency: 0.021, depth: 0.6 }).connect(g.windGain).start();
-  const gust = new Tone.Gain(0.6).connect(windPan);
-  new Tone.LFO({ frequency: 0.047, min: 0.25, max: 1 }).connect(gust.gain).start();
-  const windBP = new Tone.Filter({ type: 'bandpass', frequency: 600, Q: 1.6 }).connect(gust);
-  new Tone.LFO({ frequency: 0.033, min: 280, max: 1150 }).connect(windBP.frequency).start();
-  new Tone.Noise({ type: 'pink' }).connect(windBP).start();
+  const windPan = ctx.createStereoPanner();
+  Tone.connect(windPan, g.windGain);
+  lfo(ctx, windPan.pan, 0.021, -0.6, 0.6);
+  const gust = rawGain(ctx, 0.6);
+  gust.connect(windPan);
+  lfo(ctx, gust.gain, 0.047, 0.25, 1);
+  const windBP = biquad(ctx, 'bandpass', 600, 1.6);
+  windBP.connect(gust);
+  lfo(ctx, windBP.frequency, 0.033, 280, 1150);
+  noise(ctx, 'pink', 'wind').connect(windBP);
 }
 
-const AMB_SCALE = { rain: 0.42, river: 0.55, wind: 1.1 };
-const ambGain = (k, v) => AMB_SCALE[k] * v * v; // squared → gentle, perceptual slider
+const AMB_SCALE = { rain: 0.15, river: 0.2, wind: 0.4 };
+const ambGain = (k, v) => AMB_SCALE[k] * v ** 1.6; // curved → gentle, perceptual slider
 
 // ------------------------------------------------------------------ live updates
 
@@ -160,18 +296,15 @@ export function applySettings(g, s, prev, time = g.ctx.currentTime) {
   g.rainGain.gain.rampTo(ambGain('rain', s.rain), ramp, time);
   g.riverGain.gain.rampTo(ambGain('river', s.river), ramp, time);
   g.windGain.gain.rampTo(ambGain('wind', s.wind), ramp, time);
-  g.droneLevel.gain.rampTo(s.drone * 0.5, ramp, time);
+  g.droneLevel.gain.rampTo(s.drone * DRONE_SCALE, ramp, time);
   g.delay.feedback.rampTo(feedbackFor(s.echo), 0.8, time);
   if (!prev || prev.pace !== s.pace) g.delay.delayTime.rampTo(paceBase(s.pace) * 0.75, 1.5, time);
   if (!prev || prev.root !== s.root || prev.scale !== s.scale) {
     const f = droneFreqs(s);
     const glide = 2.5;
-    g.dOsc[0].frequency.rampTo(f.sa, glide, time);
-    g.dOsc[1].frequency.rampTo(f.pa, glide, time);
-    g.dOsc[2].frequency.rampTo(f.sa2, glide, time);
-    g.tOsc.forEach((t) => {
-      t.o.frequency.rampTo(f.sa * t.ratio, glide, time);
-      t.body.frequency.rampTo(f.sa * t.ratio, glide, time);
+    g.dOsc.concat(g.tOsc).forEach((d) => {
+      d.o.frequency.cancelScheduledValues(time);
+      d.o.frequency.setTargetAtTime(f.sa * d.ratio, time, glide / 3);
     });
     const tan = SCALES[s.scale].drone === 'tanpura';
     g.droneSoft.gain.rampTo(tan ? 0 : 1, 3, time);
@@ -298,7 +431,7 @@ export function triggerMove(g, ev, t, s) {
   const dryAmt = 1 - 0.3 * s.echo * depthNorm;
 
   const out = ctx.createGain();
-  out.gain.value = 1;
+  out.gain.value = 1.8;
   const dry = ctx.createGain();
   dry.gain.value = dryAmt;
   const rev = ctx.createGain();
