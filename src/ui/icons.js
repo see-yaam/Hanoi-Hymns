@@ -27,15 +27,17 @@ import {
   Timer,
   Triangle,
   Volume2,
+  VolumeX,
   Waves,
   Wind,
   X,
+  EyeOff,
 } from 'lucide';
 
 const ICONS = {
   ArrowLeft, ArrowRight, AudioWaveform, ChevronUp, CircleDot, CloudRain, Dice5, Download, Info, Link,
   Maximize, Minimize, Moon, Pause, Play, RotateCcw, SlidersHorizontal, StepBack, StepForward, Timer, Triangle,
-  Volume2, Waves, Wind, X,
+  Volume2, VolumeX, Waves, Wind, X, EyeOff,
 };
 
 export function renderIcons(root = document) {

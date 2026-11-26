@@ -5,7 +5,7 @@
 import * as Tone from 'tone';
 import { DEFAULTS, PRESETS, sanitize, fromHash, toHash } from './settings.js';
 import { Conductor } from './conductor.js';
-import { buildGraph, fadeMaster } from './audio/engine.js';
+import { buildGraph, fadeMaster, rampMute } from './audio/engine.js';
 import { renderWav, downloadBlob, exportFilename, exportOptions } from './audio/export.js';
 import { paceBase } from './recursion/composer.js';
 import { Scene } from './visual/scene.js';
@@ -104,8 +104,73 @@ conductor.on((type) => {
     const playing = conductor.playing && conductor.stepStopAt === null;
     body.classList.toggle('playing', playing);
     $('#btn-play').setAttribute('aria-label', playing ? 'Pause (Space)' : 'Play (Space)');
+    updatePausedLabel();
   }
   if (type === 'finished') toast('The stones rest on the far rock. Press play to begin again.');
+});
+
+/** While paused the river keeps flowing: say so, quietly. */
+function updatePausedLabel() {
+  const show = audioReady && !conductor.playing && silence.reasons.size === 0;
+  $('#paused-label').hidden = !show;
+}
+
+// ---------------------------------------------------------------- silence: "Mute all" + hidden tab
+// One controller, two reasons. Going silent pauses the stones, fades EVERYTHING to zero
+// over 1.5 s and then suspends the audio context (saves CPU). Coming back resumes the
+// context first, fades back in over 1.5 s and resumes playback only if it was playing.
+
+const FADE = 1.5;
+const silence = { reasons: new Set(), wasPlaying: false, gen: 0 };
+
+function setSilenced(reason, on) {
+  if (!conductor.graph) return;
+  const before = silence.reasons.size > 0;
+  if (on) silence.reasons.add(reason);
+  else silence.reasons.delete(reason);
+  const after = silence.reasons.size > 0;
+  if (before !== after) {
+    const g = conductor.graph;
+    const gen = ++silence.gen;
+    const raw = g.ctx.rawContext;
+    if (after) {
+      silence.wasPlaying = conductor.playing && conductor.stepStopAt === null;
+      if (conductor.playing) conductor.pause({ silent: true });
+      rampMute(g, 0, FADE);
+      setTimeout(() => {
+        if (gen === silence.gen && raw.state === 'running') raw.suspend().catch(() => {});
+      }, FADE * 1000 + 150);
+    } else {
+      const resumeAudio = raw.state === 'suspended' ? raw.resume() : Promise.resolve();
+      resumeAudio.catch(() => {}).then(() => {
+        if (gen !== silence.gen) return;
+        rampMute(g, 1, FADE);
+        if (silence.wasPlaying && !conductor.playing) conductor.play({ fade: FADE });
+        silence.wasPlaying = false;
+      });
+    }
+  }
+  const muted = silence.reasons.has('mute');
+  body.classList.toggle('muted', muted);
+  const btn = $('#btn-mute');
+  btn.setAttribute('aria-pressed', String(muted));
+  btn.setAttribute('aria-label', muted ? 'Unmute (M)' : 'Mute all sound (M)');
+  btn.title = muted ? 'Unmute (M)' : 'Mute all sound (M)';
+  updatePausedLabel();
+}
+
+const toggleMute = () => {
+  if (!needAudio()) return;
+  setSilenced('mute', !silence.reasons.has('mute'));
+};
+
+document.addEventListener('visibilitychange', () => {
+  if (!conductor.graph) return;
+  if (document.hidden) {
+    if (controls.s.autopause) setSilenced('hidden', true);
+  } else if (silence.reasons.has('hidden')) {
+    setSilenced('hidden', false);
+  }
 });
 
 const needAudio = () => {
@@ -113,11 +178,21 @@ const needAudio = () => {
   return true;
 };
 const actions = {
-  toggle: () => needAudio() && conductor.toggle(),
+  toggle: () => {
+    if (!needAudio()) return;
+    // Pressing play while muted brings the sound back and starts the stones
+    if (silence.reasons.has('mute')) {
+      silence.wasPlaying = true;
+      setSilenced('mute', false);
+      return;
+    }
+    conductor.toggle();
+  },
   restart: () => needAudio() && conductor.restart(),
   step: () => needAudio() && conductor.stepForward(),
   back: () => needAudio() && conductor.stepBack(),
 };
+$('#btn-mute').addEventListener('click', toggleMute);
 $('#btn-play').addEventListener('click', actions.toggle);
 $('#btn-restart').addEventListener('click', actions.restart);
 $('#btn-step').addEventListener('click', actions.step);
@@ -415,6 +490,10 @@ window.addEventListener('keydown', (e) => {
     case 'b':
     case 'B':
       setBreath(!breathOn);
+      break;
+    case 'm':
+    case 'M':
+      toggleMute();
       break;
     case 's':
     case 'S':

@@ -32,7 +32,8 @@ export async function buildGraph(settings, { lean = false } = {}) {
   // Master chain
   g.limiter = new Tone.Limiter(-1.5).toDestination();
   g.volume = new Tone.Volume(volumeToDb(settings.volume)).connect(g.limiter);
-  g.fader = new Tone.Gain(0).connect(g.volume);
+  g.mute = new Tone.Gain(1).connect(g.volume); // "Mute all" + hidden-tab fades (independent of play/pause fades)
+  g.fader = new Tone.Gain(0).connect(g.mute);
   g.makeup = new Tone.Gain(Tone.dbToGain(7)).connect(g.fader); // brings the soft mix up before the −10 dB master
   g.comp = new Tone.Compressor({ threshold: -16, ratio: 2, attack: 0.08, release: 0.6, knee: 10 }).connect(g.makeup);
   g.tone = new Tone.Filter({ type: 'lowpass', frequency: 7200, rolloff: -12, Q: 0.4 }).connect(g.comp);
@@ -382,6 +383,17 @@ export function setDroneActive(g, on, time = g.ctx.currentTime, secs = 3) {
     gn.cancelScheduledValues(time);
     gn.rampTo(on ? 1 : 0, secs, time);
   }
+}
+
+/**
+ * Fade EVERYTHING (music, drone, ambience) with the mute stage. The ramp always starts
+ * from the value the gain has right now (cancel-and-hold), so reversing a fade halfway
+ * never jumps — no clicks or pops.
+ */
+export function rampMute(g, level, secs = 1.5, time = g.ctx.currentTime) {
+  const p = g.mute.gain;
+  p.cancelAndHoldAtTime(time);
+  p.linearRampToValueAtTime(level, time + secs);
 }
 
 export function fadeMaster(g, level, secs, time = g.ctx.currentTime) {

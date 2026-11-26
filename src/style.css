@@ -136,6 +136,17 @@ body.panel-open .transport { left: calc((100% - var(--panel-w) - 24px) / 2); }
 body.playing .icon-btn.play .i-pause { display: block; }
 body.playing .icon-btn.play .i-play { display: none; }
 .sep { width: 1px; height: 24px; background: var(--glass-border); margin: 0 4px; }
+/* Paused: a quiet note above the transport that the river is still flowing */
+.paused-label {
+  position: absolute; left: 50%; bottom: calc(100% + 10px); transform: translateX(-50%);
+  white-space: nowrap; font-size: 11.5px; letter-spacing: 0.08em; color: var(--muted);
+  padding: 4px 12px; border-radius: 999px; background: rgba(12, 14, 40, 0.45);
+  border: 1px solid rgba(214, 204, 255, 0.1); pointer-events: none;
+  animation: label-in 0.8s var(--ease) both;
+}
+.paused-label[hidden] { display: none; }
+@keyframes label-in { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translateX(-50%); } }
+body.muted .icon-btn.play { filter: saturate(0.4) brightness(0.85); }
 
 /* ---------- settings panel ---------- */
 .panel-toggle {

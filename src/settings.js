@@ -35,6 +35,7 @@ export const DEFAULTS = {
   seed: 108,
   endless: true,
   stars: true,
+  autopause: true, // pause & fade out when the tab is hidden (a personal preference, not shared)
   rain: 0,
   river: 0.45,
   wind: 0.2,
@@ -85,6 +86,7 @@ export function sanitize(s) {
   if (Number.isNaN(o.volume)) o.volume = DEFAULTS.volume;
   o.endless = o.endless === true || o.endless === '1' || o.endless === 1;
   o.stars = !(o.stars === false || o.stars === "0" || o.stars === 0);
+  o.autopause = !(o.autopause === false || o.autopause === "0" || o.autopause === 0);
   if (o.preset && !PRESETS[o.preset]) o.preset = 'custom';
   return o;
 }

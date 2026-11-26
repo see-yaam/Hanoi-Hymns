@@ -148,6 +148,7 @@ triangle and then slowly fades. It can be toggled in the panel.
 | `→` / `←` | Step forward / step back one move |
 | `R` | Restart |
 | `F` | Focus mode (hide UI) · `Esc` to leave |
+| `M` | Mute all sound / unmute (fades everything over 1.5 s) |
 | `B` | Breathing guide |
 | `S` | Settings panel |
 | `?` | About the math |
