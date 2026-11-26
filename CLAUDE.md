@@ -3,7 +3,7 @@
 Project context for future Claude Code sessions. Keep this file concise.
 
 ## Concept
-"Every call asks a musical question. Every return answers it." (npm package: `call-and-return`; formerly "Zen Stones")
+"Every call asks a musical question. Every return answers it." (npm package: `hanoi-hymns`; formerly "Zen Stones")
 A calm riverside at dusk. River stones on 3 flat rocks are moved by a **real recursive Tower of Hanoi**;
 every move rings a synthesized tone. The moved-stone sequence 1,2,1,3,1,2,1,4… is the fractal
 **ruler sequence**, so the recursion literally composes a self-similar melody and rhythm.

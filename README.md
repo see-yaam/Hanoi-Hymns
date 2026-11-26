@@ -2,11 +2,11 @@
 
 > *Every call asks a musical question. Every return answers it.*
 
+### ▶ Live demo: **[hanoi-hymns.vercel.app](https://hanoi-hymns.vercel.app)**
+
 A calm riverside at dusk. River stones rest on three flat rocks in the water. A **truly recursive
 Tower of Hanoi** carries them across, one by one — and every move rings a singing bowl, a kalimba
 or a warm pad. The recursion doesn't just *drive* the music: it **is** the music.
-
-**Live demo:** _coming soon — `https://<your-user>.github.io/<repo>/`_
 
 ![Hanoi Hymns — Morning Mist: the call stack at depth 2, the Sierpinski constellation in the sky](docs/screenshot-main.png)
 
@@ -190,11 +190,13 @@ src/
 
 ## How AI was used
 
-This project was built with **Claude Code** (Anthropic's agentic coding CLI) during the hackathon.
-The complete prompt chain — every prompt and every full AI response — is in [`ai-logs/`](ai-logs/):
+This project was built with **Claude Code** (Anthropic's agentic coding CLI) during the hackathon,
+in one single session. The complete prompt chain — every prompt and every full AI response — is in
+[`ai-logs/`](ai-logs/):
 
-- [`ai-logs/session-01.md`](ai-logs/session-01.md) — full export of the first build session
-- [`ai-logs/claude-code-log.md`](ai-logs/claude-code-log.md) — automatic hook-based log of all later sessions
+- [`ai-logs/full-session-export.txt`](ai-logs/full-session-export.txt) — complete verbatim `/export` of the session (primary log)
+- [`ai-logs/early-session-export-1205.txt`](ai-logs/early-session-export-1205.txt) — earlier checkpoint export of the same session (12:05)
+- [`ai-logs/claude-code-log.md`](ai-logs/claude-code-log.md) — automatic hook-based log, once the hooks were active
 - [`ai-logs/README.md`](ai-logs/README.md) — how the logging works
 
 The human author directed the concept, requirements and judging priorities; Claude Code wrote the

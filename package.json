@@ -1,5 +1,5 @@
 {
-  "name": "call-and-return",
+  "name": "hanoi-hymns",
   "private": true,
   "version": "1.0.0",
   "description": "Hanoi Hymns — recursive soundscapes from the Tower of Hanoi. Every call asks a musical question. Every return answers it.",
