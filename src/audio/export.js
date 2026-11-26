@@ -9,39 +9,99 @@ import { buildGraph, performMove, performCue, triggerDroplet, setDroneActive } f
 import { rng } from '../util/random.js';
 import { PRESETS, NOTE_NAMES } from '../settings.js';
 
-const SAMPLE_RATE = 44100;
+// The master chain low-passes everything at 7.2 kHz, so rendering at 32 kHz
+// (Nyquist 16 kHz) loses nothing audible and is ~1/3 faster than 44.1 kHz.
+const SAMPLE_RATE = 32000;
 const TARGET_LUFS = -16;
 const PEAK_CEILING_DB = -1.2; // keep true-ish peak safely below −1 dBFS
+const CLIP_FADE = 3; // natural fade-out at the end of a clip (seconds)
+const CLIP_RING = 1.5; // let the cadence ring before the fade begins
+
+// Render speed (seconds of work per second of audio). Calibrated on this laptop
+// (≈ 21 s for 60 s at 32 kHz) and refined after every completed export.
+const SPEED_KEY = 'hanoi-hymns-render-speed';
+const DEFAULT_SPEED = 0.38;
+function renderSpeed() {
+  try {
+    const v = parseFloat(localStorage.getItem(SPEED_KEY));
+    if (Number.isFinite(v) && v > 0.02 && v < 5) return v;
+  } catch (e) { /* storage unavailable */ }
+  return DEFAULT_SPEED;
+}
+function rememberSpeed(v) {
+  try { localStorage.setItem(SPEED_KEY, String(0.5 * renderSpeed() + 0.5 * v)); } catch (e) { /* ignore */ }
+}
 
 export function exportInfo(settings) {
   const score = composeCycle(settings, 0, 0, 0);
   return { ...score, duration: cycleDuration(score, 12) };
 }
 
-export function exportFilename(s) {
+/**
+ * End a clip on the strongest cadence (the return of the largest call) that fits
+ * the target length, then let it ring and fade naturally.
+ */
+function clipLength(events, target) {
+  const latest = target - CLIP_RING - CLIP_FADE;
+  const inWindow = (lo) => events.filter((e) => e.phraseEnd && e.time <= latest && e.time >= lo);
+  let window = inWindow(target - 20); // stay close to the promised length
+  if (!window.length) window = inWindow(target * 0.6);
+  if (!window.length) return target;
+  const best = window.reduce((a, b) => (b.cadence > a.cadence || (b.cadence === a.cadence && b.time > a.time) ? b : a));
+  return best.time + CLIP_RING + CLIP_FADE;
+}
+
+/** Export length options with their duration and estimated render time. */
+export function exportOptions(settings) {
+  const info = exportInfo(settings);
+  const speed = renderSpeed();
+  const est = (sec) => Math.round(1.5 + sec * speed + sec * 0.012);
+  const fmt = (sec) => (sec < 90 ? `${Math.round(sec)} s` : `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')} min`);
+  const opts = [];
+  if (info.duration > 75) {
+    const d = clipLength(info.events, 60);
+    opts.push({ id: 'quick', label: 'Quick clip', detail: '1 min', seconds: d, estimate: est(d) });
+  }
+  if (info.duration > 200) {
+    const d = clipLength(info.events, 180);
+    opts.push({ id: 'short', label: 'Short', detail: '3 min', seconds: d, estimate: est(d) });
+  }
+  opts.push({ id: 'full', label: 'Full piece', detail: fmt(info.duration), seconds: info.duration, estimate: est(info.duration) });
+  opts.forEach((o) => { o.estimateText = `≈ ${fmt(o.estimate)} to render`; o.lengthText = fmt(o.seconds); });
+  return opts;
+}
+
+export function exportFilename(s, length = 'full') {
   const preset = s.preset && PRESETS[s.preset] ? s.preset : 'custom';
   const root = NOTE_NAMES[s.root].replace('#', 's');
-  return `hanoi-hymns_${preset}_${s.n}-stones_${s.scale}-${root}_seed-${s.seed}.wav`;
+  const tag = length === 'full' ? 'full' : length === 'short' ? '3min' : '1min';
+  return `hanoi-hymns_${preset}_${s.n}-stones_${s.scale}-${root}_seed-${s.seed}_${tag}.wav`;
 }
+
+const aborted = () => Object.assign(new Error('Export cancelled'), { name: 'AbortError' });
 
 /**
  * @param {object} settings
  * @param {(phase: string, fraction: number) => void} onProgress
- * @param {{limit?: number}} opts  limit: render only the first N seconds (used for level checks)
+ * @param {{limit?: number, length?: 'quick'|'short'|'full', signal?: AbortSignal}} opts
+ *   limit: render only the first N seconds (level checks); length: clip option; signal: cancel
  * @returns {Promise<{blob: Blob, stats: object}>}
  */
-export async function renderWav(settings, onProgress = () => {}, { limit = Infinity } = {}) {
+export async function renderWav(settings, onProgress = () => {}, { limit = Infinity, length = 'full', signal } = {}) {
   const score = exportInfo(settings);
-  const duration = Math.min(score.duration, limit);
-  const events = score.events.filter((e) => e.time < duration);
-  const cues = score.cues.filter((c) => c.time < duration);
+  const opt = exportOptions(settings).find((o) => o.id === length);
+  const isClip = length !== 'full' && opt;
+  const duration = Math.min(isClip ? opt.seconds : score.duration, limit);
+  const events = score.events.filter((e) => e.time < duration - (isClip ? CLIP_FADE : 0));
+  const cues = score.cues.filter((c) => c.time < duration - (isClip ? CLIP_FADE : 0));
   const finalCue = score.cues.find((c) => c.kind === 'final');
   onProgress('Composing the stones…', 0.02);
+  if (signal?.aborted) throw aborted();
 
-  // Tone.Offline exposes no render progress, so estimate it from a measured
-  // speed and ease the bar toward 90 % until rendering resolves.
+  // The offline renderer exposes no progress, so ease the bar toward 90 % using
+  // the measured render speed of this machine.
   const started = performance.now();
-  const expectedMs = 2000 + duration * 550; // measured: ≈ 35 s to render 60 s on a busy laptop
+  const expectedMs = (1.5 + duration * renderSpeed()) * 1000;
   let rendering = true;
   const timer = setInterval(() => {
     if (!rendering) return;
@@ -53,14 +113,21 @@ export async function renderWav(settings, onProgress = () => {}, { limit = Infin
   try {
     buffer = await renderOffline(async () => {
       const g = await buildGraph(settings, { lean: true });
-      // 2 s fade-in; the bed (drone + harmony) breathes out after the final cadence;
-      // the master then fades naturally (exponential) over the last seconds.
+      // 2 s fade-in on every export
       g.fader.gain.setValueAtTime(0, 0);
       g.fader.gain.linearRampToValueAtTime(1, 2);
-      g.fader.gain.setValueAtTime(1, Math.max(2.1, duration - 6));
-      g.fader.gain.setTargetAtTime(0, Math.max(2.1, duration - 6), 1.4);
+      if (isClip || duration < score.duration) {
+        // Clip: the cadence rings, then a smooth equal-power 3 s fade (never a hard cut)
+        const curve = new Float32Array(64).map((_, i) => Math.cos((i / 63) * Math.PI / 2));
+        g.fader.gain.setValueAtTime(1, duration - CLIP_FADE - 0.01);
+        g.fader.gain.setValueCurveAtTime(curve, duration - CLIP_FADE, CLIP_FADE - 0.02);
+      } else {
+        // Full piece: the bed breathes out after the final cadence, then a natural fade
+        g.fader.gain.setValueAtTime(1, Math.max(2.1, duration - 6));
+        g.fader.gain.setTargetAtTime(0, Math.max(2.1, duration - 6), 1.4);
+      }
       setDroneActive(g, true, 0, 2);
-      if (finalCue && finalCue.time < duration) setDroneActive(g, false, finalCue.time + 1.5, 7);
+      if (!isClip && finalCue && finalCue.time < duration) setDroneActive(g, false, finalCue.time + 1.5, 7);
       // Merge moves and cues in time order so harmony voice-leading matches live playback
       const timeline = events.map((ev) => ({ t: ev.time, ev })).concat(cues.map((cue) => ({ t: cue.time, cue })));
       timeline.sort((a, b) => a.t - b.t);
@@ -80,6 +147,8 @@ export async function renderWav(settings, onProgress = () => {}, { limit = Infin
     rendering = false;
     clearInterval(timer);
   }
+  if (signal?.aborted) throw aborted(); // cancelled while rendering: discard the result
+  rememberSpeed((performance.now() - started) / 1000 / duration);
 
   const audio = buffer.get();
   onProgress('Balancing the levels…', 0.9);
@@ -88,7 +157,10 @@ export async function renderWav(settings, onProgress = () => {}, { limit = Infin
   const lufsGain = Number.isFinite(before.lufs) ? 10 ** ((TARGET_LUFS - before.lufs) / 20) : 1;
   const peakGain = before.peak > 0 ? 10 ** (PEAK_CEILING_DB / 20) / before.peak : 1;
   const gain = Math.min(lufsGain, peakGain, 8);
-  const blob = await encodeWav(audio, (f) => onProgress('Pressing the stones into a file…', 0.92 + 0.08 * f), gain);
+  const blob = await encodeWav(audio, (f) => {
+    if (signal?.aborted) throw aborted();
+    onProgress('Pressing the stones into a file…', 0.92 + 0.08 * f);
+  }, gain);
   const gdb = 20 * Math.log10(gain);
   const stats = {
     seconds: +duration.toFixed(1),

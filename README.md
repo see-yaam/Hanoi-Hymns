@@ -125,11 +125,15 @@ triangle and then slowly fades. It can be toggled in the panel.
 - **Presets** — Morning Mist · Monsoon Evening · Temple Night · Deep Sleep, each with a small
   hand-drawn mood thumbnail.
 - **Share link** — all settings + seed live in the URL hash; anyone opening it hears the same piece.
-- **Download my soundscape** — renders one full solve offline with the *same* audio graph, fades in
-  over 2 s and out naturally, normalises to about −16 LUFS with peaks below −1 dBFS, and saves a
-  16-bit stereo 44.1 kHz WAV. A calm progress card shows meanwhile. The filename includes preset,
-  stones, scale and seed. (Measured: 60 s of Morning Mist → −16.0 LUFS, peak −2.96 dBFS,
-  RMS −18.4 dBFS, no clipping.)
+- **Download my soundscape** — choose **Quick clip (1 min)** (default), **Short (3 min)** or the
+  **Full piece**. Each option shows its estimated render time, calibrated on the user's own machine
+  after every export. Clips end on the strongest cadence (the return of the largest call) near the
+  chosen length, ring out briefly and close with a soft 3 s fade, never a hard cut. Everything is
+  rendered offline with the *same* audio graph, fades in over 2 s, is normalised to about −16 LUFS
+  with peaks below −1 dBFS, and saved as a 16-bit stereo WAV at 32 kHz (the master low-pass at
+  7.2 kHz means nothing audible is lost, and rendering is a third faster). A calm progress card can
+  be cancelled at any time. Measured on the dev laptop: a quick clip takes ≈ 12 s end to end.
+  (60 s of Morning Mist → −16.0 LUFS, peak −2.96 dBFS, RMS −18.4 dBFS, no clipping.)
 - **Calm tools** — breathing guide (inhale 4 · hold 4 · exhale 6, following the pace), sleep timer
   (10 / 20 / 30 min with a one-minute fade-out), focus mode (hide all UI), *About the math* modal.
 - **Accessible** — full keyboard control, visible focus rings, ARIA labels, good contrast,

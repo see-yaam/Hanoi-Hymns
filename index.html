@@ -243,11 +243,25 @@
     <!-- Export overlay -->
     <div id="export-overlay" class="export-overlay" role="dialog" aria-modal="true" aria-labelledby="export-title" hidden>
       <div class="glass export-card">
-        <div class="export-ring" aria-hidden="true"></div>
-        <h2 id="export-title">Rendering your soundscape</h2>
-        <p id="export-phase" class="muted">Composing the stones…</p>
-        <div class="progress big" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="export-progress"><div id="export-bar"></div></div>
-        <p class="muted tiny">Breathe slowly — this takes a little while.</p>
+        <div id="export-choose">
+          <h2 id="export-title">Download my soundscape</h2>
+          <fieldset id="export-options" class="export-options">
+            <legend class="sr-only">Length of the recording</legend>
+          </fieldset>
+          <p class="muted tiny">WAV · 16-bit stereo · 2 s fade-in · clips end on a cadence with a soft 3 s fade</p>
+          <div class="export-actions">
+            <button id="export-dismiss" class="chip">Cancel</button>
+            <button id="export-go" class="wide primary"><i data-lucide="download"></i>Render &amp; download</button>
+          </div>
+        </div>
+        <div id="export-running" hidden>
+          <div class="export-ring" aria-hidden="true"></div>
+          <h2>Rendering your soundscape</h2>
+          <p id="export-phase" class="muted" aria-live="polite">Composing the stones…</p>
+          <div class="progress big" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="export-progress"><div id="export-bar"></div></div>
+          <p id="export-eta" class="muted tiny"></p>
+          <button id="export-stop" class="chip">Cancel export</button>
+        </div>
       </div>
     </div>
 

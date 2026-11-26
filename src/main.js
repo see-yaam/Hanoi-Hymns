@@ -6,7 +6,7 @@ import * as Tone from 'tone';
 import { DEFAULTS, PRESETS, sanitize, fromHash, toHash } from './settings.js';
 import { Conductor } from './conductor.js';
 import { buildGraph, fadeMaster } from './audio/engine.js';
-import { renderWav, downloadBlob, exportFilename, exportInfo } from './audio/export.js';
+import { renderWav, downloadBlob, exportFilename, exportOptions } from './audio/export.js';
 import { paceBase } from './recursion/composer.js';
 import { Scene } from './visual/scene.js';
 import { StackView } from './visual/stack.js';
@@ -267,42 +267,100 @@ $('#btn-share').addEventListener('click', async () => {
 // ---------------------------------------------------------------- export
 
 function updateExportNote() {
-  const { duration } = exportInfo(controls.s);
-  const mb = (duration * 44100 * 4) / 1048576;
-  const m = Math.floor(duration / 60);
-  const s = Math.round(duration % 60);
-  $('#export-note').textContent = `One full solve · ${2 ** controls.s.n - 1} moves · ${m}:${String(s).padStart(2, '0')} · WAV ≈ ${mb.toFixed(0)} MB`;
+  const opts = exportOptions(controls.s);
+  const quick = opts[0];
+  $('#export-note').textContent = `${opts.map((o) => `${o.label} ${o.lengthText}`).join(' · ')} — ${quick.label.toLowerCase()} renders in ${quick.estimateText.replace(' to render', '')}`;
 }
 updateExportNote();
 
-$('#btn-export').addEventListener('click', async () => {
-  const btn = $('#btn-export');
-  if (btn.disabled) return;
-  btn.disabled = true;
-  const overlay = $('#export-overlay');
-  overlay.hidden = false;
-  const wasPlaying = conductor.playing;
-  if (wasPlaying) conductor.pause();
+// Export dialog: choose a length (with estimated render time), render, or cancel.
+const exportOverlay = $('#export-overlay');
+let exportJob = null; // { controller, wasPlaying }
+let exportReturnFocus = null;
+
+function openExportDialog() {
+  if (exportJob) return;
+  exportReturnFocus = document.activeElement;
+  const opts = exportOptions(controls.s);
+  const box = $('#export-options');
+  box.querySelectorAll('label').forEach((l) => l.remove());
+  opts.forEach((o, i) => {
+    const label = document.createElement('label');
+    label.className = 'export-opt';
+    label.innerHTML = `<input type="radio" name="export-length" value="${o.id}" ${i === 0 ? 'checked' : ''} />
+      <span class="eo-main"><b>${o.label}</b> <span class="muted">(${o.detail})</span></span>
+      <span class="eo-est muted tiny">${o.estimateText}</span>`;
+    box.appendChild(label);
+  });
+  $('#export-choose').hidden = false;
+  $('#export-running').hidden = true;
+  exportOverlay.hidden = false;
+  setTimeout(() => box.querySelector('input:checked').focus(), 30);
+}
+
+function closeExportDialog() {
+  exportOverlay.hidden = true;
+  $('#export-bar').style.transform = 'scaleX(0)';
+  exportReturnFocus?.focus?.({ preventScroll: true });
+}
+
+async function startExport() {
+  const length = $('#export-options input:checked')?.value || 'quick';
+  const opt = exportOptions(controls.s).find((o) => o.id === length);
+  const s = controls.s;
+  const controller = new AbortController();
+  exportJob = { controller, wasPlaying: conductor.playing };
+  if (exportJob.wasPlaying) conductor.pause();
+  $('#export-choose').hidden = true;
+  $('#export-running').hidden = false;
+  $('#export-eta').textContent = `${opt.label} · ${opt.lengthText} of sound · ${opt.estimateText}`;
+  $('#export-stop').focus();
   const bar = $('#export-bar');
   const prog = $('#export-progress');
+  const job = exportJob;
   try {
-    const s = controls.s;
     const { blob } = await renderWav(s, (phase, f) => {
+      if (controller.signal.aborted) return;
       $('#export-phase').textContent = phase;
       bar.style.transform = `scaleX(${f.toFixed(3)})`;
       prog.setAttribute('aria-valuenow', String(Math.round(f * 100)));
-    });
-    downloadBlob(blob, exportFilename(s));
+    }, { length, signal: controller.signal });
+    if (controller.signal.aborted) return;
+    downloadBlob(blob, exportFilename(s, length));
     toast('Your soundscape is ready.');
   } catch (err) {
-    console.error(err);
-    toast('Export failed — please try fewer stones or a faster pace.');
+    if (err.name !== 'AbortError') {
+      console.error(err);
+      toast('Export failed — please try a shorter clip.');
+    }
   } finally {
-    overlay.hidden = true;
-    btn.disabled = false;
-    bar.style.transform = 'scaleX(0)';
-    if (wasPlaying) conductor.play();
+    if (exportJob === job) finishExport();
   }
+}
+
+function finishExport() {
+  const job = exportJob;
+  exportJob = null;
+  closeExportDialog();
+  if (job?.wasPlaying) conductor.play();
+}
+
+function cancelExport() {
+  if (!exportJob) return;
+  exportJob.controller.abort(); // the dialog closes now; any unfinished render is discarded
+  finishExport();
+  toast('Export cancelled.');
+}
+
+$('#btn-export').addEventListener('click', openExportDialog);
+$('#export-go').addEventListener('click', startExport);
+$('#export-dismiss').addEventListener('click', closeExportDialog);
+$('#export-stop').addEventListener('click', cancelExport);
+exportOverlay.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  e.preventDefault();
+  if (exportJob) cancelExport();
+  else closeExportDialog();
 });
 
 // ---------------------------------------------------------------- toast

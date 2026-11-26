@@ -83,7 +83,11 @@ export function composeCycle({ n, from, to, pace, seed }, cycle = 0, startTime =
     if (e.type === 'return') {
       harm.pop();
       // A call of size ≥ 2 ends right after this move: a cadence
-      if (e.n >= 2 && events.length) events[events.length - 1].phraseEnd = true;
+      if (e.n >= 2 && events.length) {
+        const last = events[events.length - 1];
+        last.phraseEnd = true;
+        last.cadence = Math.max(last.cadence, e.n); // size of the largest call this move closes
+      }
       continue;
     }
     // move
@@ -108,6 +112,7 @@ export function composeCycle({ n, from, to, pace, seed }, cycle = 0, startTime =
       swell: swellFor(e.index, e.stack),
       phraseStart: pendingQuestion,
       phraseEnd: false,
+      cadence: 0,
     });
     pendingQuestion = false;
     // Fractal breath: bigger stones leave longer silences behind them.
