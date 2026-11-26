@@ -19,7 +19,7 @@ export function exportInfo(settings) {
 export function exportFilename(s) {
   const preset = s.preset && PRESETS[s.preset] ? s.preset : 'custom';
   const root = NOTE_NAMES[s.root].replace('#', 's');
-  return `zen-stones_${preset}_${s.n}-stones_${s.scale}-${root}_seed-${s.seed}.wav`;
+  return `hanoi-hymns_${preset}_${s.n}-stones_${s.scale}-${root}_seed-${s.seed}.wav`;
 }
 
 /**

@@ -1,8 +1,8 @@
 {
-  "name": "zen-stones",
+  "name": "call-and-return",
   "private": true,
   "version": "1.0.0",
-  "description": "Zen Stones — recursive soundscapes from the Tower of Hanoi",
+  "description": "Hanoi Hymns — recursive soundscapes from the Tower of Hanoi. Every call asks a musical question. Every return answers it.",
   "type": "module",
   "scripts": {
     "dev": "vite",

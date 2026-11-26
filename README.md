@@ -1,6 +1,6 @@
-# 🪨 Zen Stones — Recursive Soundscapes
+# 🪨 Hanoi Hymns — Recursive Soundscapes
 
-> *Let the recursion carry the stones, and the river carry your thoughts.*
+> *Every call asks a musical question. Every return answers it.*
 
 A calm riverside at dusk. River stones rest on three flat rocks in the water. A **truly recursive
 Tower of Hanoi** carries them across, one by one — and every move rings a singing bowl, a kalimba
@@ -8,7 +8,7 @@ or a warm pad. The recursion doesn't just *drive* the music: it **is** the music
 
 **Live demo:** _coming soon — `https://<your-user>.github.io/<repo>/`_
 
-![Zen Stones — Morning Mist, a stone mid-flight while the call stack shows depth 3](docs/screenshot-main.png)
+![Hanoi Hymns — Morning Mist, a stone mid-flight while the call stack shows depth 3](docs/screenshot-main.png)
 
 | Temple Night (3 stones, finished solve) | Mobile |
 |---|---|
@@ -30,7 +30,7 @@ Write down which stone moves at each step of the Hanoi solution:
 This is the **ruler sequence** — it looks like the tick marks on a ruler. Every block is two copies
 of the previous block joined by a new, larger number: a **fractal**, self-similar at every scale.
 
-In Zen Stones that sequence becomes the melody (each stone has its own pitch) *and* the rhythm
+In Hanoi Hymns that sequence becomes the melody (each stone has its own pitch) *and* the rhythm
 (after a bigger stone moves, the river takes a longer breath). Small, high stones chime often;
 big, low stones speak rarely and deeply — and the very largest stone, which moves only once,
 in the exact middle of the piece, is marked by a deep gong. You can watch the ruler sequence build up

@@ -74,7 +74,7 @@ function makeImpulse(ctx, decay, preDelay) {
   const len = Math.floor(sr * (decay + preDelay));
   const buf = ctx.createBuffer(2, len, sr);
   for (let c = 0; c < 2; c++) {
-    const r = mulberry32(hashSeed('zen-impulse', c));
+    const r = mulberry32(hashSeed('hanoi-hymns-impulse', c));
     const d = buf.getChannelData(c);
     let y = 0;
     for (let i = 0; i < len; i++) {

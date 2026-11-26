@@ -1,5 +1,5 @@
 /**
- * Zen Stones — entry point. Wires the recursion, the conductor (clock + audio),
+ * Hanoi Hymns — entry point. Wires the recursion, the conductor (clock + audio),
  * the canvas scene, the recursion panel and all UI / calm tools together.
  */
 import * as Tone from 'tone';
@@ -371,4 +371,4 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Expose for debugging in the console (harmless in production)
-window.zen = { conductor, scene, controls, paceBase };
+window.hymns = { conductor, scene, controls, paceBase };

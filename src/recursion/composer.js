@@ -39,7 +39,7 @@ export function cyclePegs(from, to, k) {
 export function composeCycle({ n, from, to, pace, seed }, cycle = 0, startTime = 0, startIndex = 0) {
   const base = paceBase(pace);
   const flight = Math.min(base * 0.7, 1.7);
-  const r = rng('zen-stones', seed, n, from, to, pace, cycle);
+  const r = rng('hanoi-hymns', seed, n, from, to, pace, cycle);
   const events = [];
   let t = startTime + flight + (cycle === 0 ? 1.2 : base * 2.5);
   for (const mv of hanoi(n, from, to)) {
