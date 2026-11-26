@@ -16,6 +16,7 @@ import * as Tone from 'tone';
 import { SCALES, VOICINGS, stoneMidi, midiToFreq } from '../settings.js';
 import { paceBase } from '../recursion/composer.js';
 import { mulberry32, hashSeed } from '../util/random.js';
+import { chordPcs, voiceLead, initialVoicing, snapToChord } from './harmony.js';
 
 export const PEG_PAN = [-0.55, 0, 0.55];
 
@@ -36,10 +37,12 @@ export async function buildGraph(settings, { lean = false } = {}) {
   g.comp = new Tone.Compressor({ threshold: -16, ratio: 2, attack: 0.08, release: 0.6, knee: 10 }).connect(g.makeup);
   g.tone = new Tone.Filter({ type: 'lowpass', frequency: 7200, rolloff: -12, Q: 0.4 }).connect(g.comp);
   g.bus = new Tone.Gain(1).connect(g.tone);
+  // Everything except the drone passes a low-cut at 80 Hz (keeps the low end clean)
+  g.music = new Tone.Filter({ type: 'highpass', frequency: 80, rolloff: -24, Q: 0.5 }).connect(g.bus);
 
-  // Reverb (send/return) — long, dark and soft
+  // One shared long reverb (≈7 s decay, 40 ms pre-delay) — dark, decorrelated stereo
   g.reverb = new Tone.Convolver({ normalize: true });
-  g.reverb.buffer = makeImpulse(ctx, 6.5, 0.05);
+  g.reverb.buffer = makeImpulse(ctx, 7, 0.04);
   g.revIn = new Tone.Gain(1);
   g.revHP = new Tone.Filter({ type: 'highpass', frequency: 160 });
   g.revLP = new Tone.Filter({ type: 'lowpass', frequency: 4200, rolloff: -12 });
@@ -52,16 +55,74 @@ export async function buildGraph(settings, { lean = false } = {}) {
   g.delLP = new Tone.Filter({ type: 'lowpass', frequency: 2400, rolloff: -12 });
   g.delOut = new Tone.Gain(0.6);
   g.delIn.chain(g.delay, g.delLP, g.delOut);
-  g.delOut.connect(g.bus);
+  g.delOut.connect(g.music);
   g.delOut.connect(g.revIn);
 
   // Peg panners: A left, B centre, C right
-  g.pegs = PEG_PAN.map((p) => new Tone.Panner(p).connect(g.bus));
+  g.pegs = PEG_PAN.map((p) => new Tone.Panner(p).connect(g.music));
 
   buildDrone(g, settings, lean);
+  buildHarmony(g, settings);
   buildAmbience(g, settings);
 
   return g;
+}
+
+// ------------------------------------------------------------------ harmony pad (the call stack, as chords)
+
+/**
+ * Four persistent, softly detuned voices that glide between chords. Calls push the
+ * harmony away from home, returns pull it back; each voice moves to its nearest note.
+ */
+function buildHarmony(g, settings) {
+  const ctx = g.ctx;
+  g.harmActive = new Tone.Gain(0);
+  g.harmActive.connect(g.music);
+  g.harmSend = new Tone.Gain(0.7).connect(g.revIn);
+  g.harmActive.connect(g.harmSend);
+  g.harmAmp = rawGain(ctx, HARM_LEVEL);
+  Tone.connect(g.harmAmp, g.harmActive);
+  g.harmLP = biquad(ctx, 'lowpass', 750, 0.4);
+  g.harmLP.connect(g.harmAmp);
+  lfo(ctx, g.harmLP.Q, 0.07, 0.3, 0.6);
+  g.harmVoicing = initialVoicing(settings.scale, settings.root);
+  g.harmVoices = g.harmVoicing.map((m, i) => {
+    const f = midiToFreq(m);
+    const level = i === 0 ? 0.55 : 0.32;
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = [0, -0.35, 0.3, -0.1][i]; // subtle stereo width
+    pan.connect(g.harmLP);
+    const oscs = (i === 0 ? [['sine', 0], ['triangle', 4]] : [['triangle', -6], ['triangle', 6]]).map(([type, cents]) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.value = f;
+      o.detune.value = cents;
+      const gn = rawGain(ctx, level);
+      o.connect(gn);
+      gn.connect(pan);
+      o.start();
+      return o;
+    });
+    return { oscs };
+  });
+}
+
+const HARM_LEVEL = 0.05;
+
+/** Glide the pad to the chord of this move (voice-led from what is sounding now). */
+function setHarmony(g, ev, t, s) {
+  const pcs = chordPcs(s.scale, ev.chord, s.root);
+  const next = voiceLead(g.harmVoicing, pcs);
+  g.harmVoicing = next;
+  g.harmNow = { chord: ev.chord, harmDepth: ev.harmDepth };
+  next.forEach((m, i) => {
+    for (const o of g.harmVoices[i].oscs) o.frequency.setTargetAtTime(midiToFreq(m), t, 0.4);
+  });
+  // Tension opens the filter a little; cadences soften the level
+  const away = Math.min(3, ev.harmDepth);
+  g.harmLP.frequency.setTargetAtTime(700 + 140 * away, t, 0.8);
+  const dyn = (0.8 + 0.2 * ev.swell) * (ev.phraseEnd ? 0.88 : 1);
+  g.harmAmp.gain.setTargetAtTime(HARM_LEVEL * dyn, t, 0.9);
 }
 
 /**
@@ -239,7 +300,7 @@ function buildDrone(g, settings, lean) {
 function buildAmbience(g, settings) {
   const ctx = g.ctx;
   // Rain: two decorrelated pink noises spread across the stereo field
-  g.rainGain = new Tone.Gain(ambGain('rain', settings.rain)).connect(g.bus);
+  g.rainGain = new Tone.Gain(ambGain("rain", settings.rain)).connect(g.music);
   const rainHP = biquad(ctx, 'highpass', 420);
   const rainLP = biquad(ctx, 'lowpass', 3600, 0.5);
   const rainLP2 = biquad(ctx, 'lowpass', 4200, 0.5);
@@ -254,12 +315,12 @@ function buildAmbience(g, settings) {
   });
   // Droplets bus (individual drops are triggered by the scheduler)
   g.dropBus = new Tone.Gain(1);
-  g.dropBus.connect(g.bus);
+  g.dropBus.connect(g.music);
   g.dropRev = new Tone.Gain(0.5).connect(g.revIn);
   g.dropBus.connect(g.dropRev);
 
   // River: low brown noise, slow filter + level modulation, gently wandering in stereo
-  g.riverGain = new Tone.Gain(ambGain('river', settings.river)).connect(g.bus);
+  g.riverGain = new Tone.Gain(ambGain("river", settings.river)).connect(g.music);
   const riverAmp = rawGain(ctx, 0.8);
   Tone.connect(riverAmp, g.riverGain);
   lfo(ctx, riverAmp.gain, 0.11, 0.6, 1);
@@ -272,7 +333,7 @@ function buildAmbience(g, settings) {
   noise(ctx, 'brown', 'river').connect(riverPan);
 
   // Wind: band-passed pink noise with a very slow sweep and gusts
-  g.windGain = new Tone.Gain(ambGain('wind', settings.wind)).connect(g.bus);
+  g.windGain = new Tone.Gain(ambGain("wind", settings.wind)).connect(g.music);
   const windPan = ctx.createStereoPanner();
   Tone.connect(windPan, g.windGain);
   lfo(ctx, windPan.pan, 0.021, -0.6, 0.6);
@@ -306,15 +367,21 @@ export function applySettings(g, s, prev, time = g.ctx.currentTime) {
       d.o.frequency.cancelScheduledValues(time);
       d.o.frequency.setTargetAtTime(f.sa * d.ratio, time, glide / 3);
     });
+    // Re-voice the current chord in the new key (smooth glide, no restart)
+    const cur = g.harmNow || { chord: 0, harmDepth: 0 };
+    setHarmony(g, { ...cur, swell: 0.7, phraseEnd: false }, time, s);
     const tan = SCALES[s.scale].drone === 'tanpura';
     g.droneSoft.gain.rampTo(tan ? 0 : 1, 3, time);
     g.droneTan.gain.rampTo(tan ? 1 : 0, 3, time);
   }
 }
 
+/** Fade the musical bed (drone + harmony pad) in or out — always ramped, never clicks. */
 export function setDroneActive(g, on, time = g.ctx.currentTime, secs = 3) {
-  g.droneActive.gain.cancelScheduledValues(time);
-  g.droneActive.gain.rampTo(on ? 1 : 0, secs, time);
+  for (const gn of [g.droneActive.gain, g.harmActive.gain]) {
+    gn.cancelScheduledValues(time);
+    gn.rampTo(on ? 1 : 0, secs, time);
+  }
 }
 
 export function fadeMaster(g, level, secs, time = g.ctx.currentTime) {
@@ -348,7 +415,18 @@ const BOWL_PARTIALS = [
   { r: 8.93, a: 0.045, d: 1.6, beat: 0 },
 ];
 
-function bowlVoice(ctx, dest, f, t, vel, detune, decayMul = 1) {
+/** Gentle high-shelf cut above ~7 kHz for the bell-like voices. */
+function bellShelf(ctx, dest) {
+  const shelf = ctx.createBiquadFilter();
+  shelf.type = 'highshelf';
+  shelf.frequency.value = 7000;
+  shelf.gain.value = -6;
+  shelf.connect(dest);
+  return shelf;
+}
+
+function bowlVoice(ctx, out, f, t, vel, detune, decayMul = 1) {
+  const dest = bellShelf(ctx, out);
   const parts = [];
   const scale = clamp((262 / f) ** 0.35, 0.75, 1.35) * decayMul;
   const peak = 0.13 * vel;
@@ -367,7 +445,7 @@ function kalimbaVoice(ctx, dest, f, t, vel, detune) {
   lp.type = 'lowpass';
   lp.frequency.setValueAtTime(Math.min(4200, f * 7), t);
   lp.Q.value = 0.5;
-  lp.connect(dest);
+  lp.connect(bellShelf(ctx, dest));
   const peak = 0.19 * vel;
   const scale = clamp((392 / f) ** 0.4, 0.7, 1.4);
   const parts = [
@@ -420,10 +498,14 @@ function padVoice(ctx, dest, f, t, vel, detune, hold) {
 export function triggerMove(g, ev, t, s) {
   const ctx = g.ctx;
   const instrument = VOICINGS[s.voicing].map[ev.to];
-  const midi = stoneMidi(ev.stone, ev.n, s, instrument);
+  let midi = stoneMidi(ev.stone, ev.n, s, instrument);
+  // Strong beats (stone ≥ 2 in the ruler hierarchy) prefer a tone of the current chord
+  if (ev.strong && ev.chord !== undefined) midi = snapToChord(midi, chordPcs(s.scale, ev.chord, s.root), s.scale, s.root);
   const f = midiToFreq(midi);
-  // Bigger (lower) stones get a little more weight
-  const vel = ev.vel * (0.85 + 0.15 * (ev.stone / ev.n));
+  // Bigger (lower) stones get a little more weight; phrases swell toward their middle
+  // move and soften at their cadence.
+  const swell = ev.swell === undefined ? 1 : ev.swell;
+  const vel = ev.vel * (0.85 + 0.15 * (ev.stone / ev.n)) * (0.84 + 0.16 * swell) * (ev.phraseEnd ? 0.9 : 1);
   // Recursion depth → space. Deeper calls (small stones) echo further away.
   const depthNorm = ev.n > 1 ? ev.depth / (ev.n - 1) : 0;
   const revAmt = 0.22 + 0.25 * s.echo + 0.45 * s.echo * depthNorm;
@@ -460,6 +542,17 @@ export function triggerMove(g, ev, t, s) {
   return {
     start: t,
     stop,
+    /** Polyphony limit: let an old, still-ringing voice fade away smoothly. */
+    release(at) {
+      out.gain.cancelScheduledValues(at);
+      out.gain.setTargetAtTime(0, at, 0.45);
+      this.stop = Math.min(this.stop, at + 3);
+      parts.forEach((p) => {
+        if (p.stop > at + 3) {
+          try { p.o.stop(at + 3); } catch (e) { /* ignore */ }
+        }
+      });
+    },
     cancel() {
       parts.forEach((p) => {
         try { p.o.stop(); } catch (e) { /* already stopped */ }
@@ -470,6 +563,55 @@ export function triggerMove(g, ev, t, s) {
       try { out.disconnect(); dry.disconnect(); rev.disconnect(); del.disconnect(); } catch (e) { /* ignore */ }
     },
   };
+}
+
+// ------------------------------------------------------------------ performer (shared by live playback and export)
+
+const MAX_VOICES = 7;
+
+/**
+ * Play one move: harmony glide + melodic voice, keeping polyphony bounded so long
+ * tails never pile up into mud. `pool` is the caller's list of live voice handles.
+ */
+export function performMove(g, ev, t, s, pool) {
+  setHarmony(g, ev, Math.max(g.ctx.currentTime, t - 0.25), s);
+  const v = triggerMove(g, ev, t, s);
+  const ringing = pool.filter((p) => p.stop > t && !p.released);
+  if (ringing.length >= MAX_VOICES) {
+    ringing.sort((a, b) => a.start - b.start);
+    for (const old of ringing.slice(0, ringing.length - MAX_VOICES + 1)) {
+      old.release(t);
+      old.released = true;
+    }
+  }
+  pool.push(v);
+  return v;
+}
+
+/** Bowl strikes on the tonic: the top-level call's question (open) and its answer (final). */
+export function performCue(g, cue, t, s) {
+  const ctx = g.ctx;
+  let root = s.root;
+  if (root > 6) root -= 12;
+  const out = ctx.createGain();
+  out.gain.value = 1.8;
+  const rev = ctx.createGain();
+  rev.gain.value = cue.kind === 'final' ? 0.75 : 0.55;
+  out.connect(rev);
+  Tone.connect(out, g.pegs[1]);
+  Tone.connect(rev, g.revIn);
+  let parts;
+  if (cue.kind === 'open') {
+    parts = bowlVoice(ctx, out, midiToFreq(60 + root), t, 0.62, 0, 1.2);
+  } else {
+    // Full resolution: settle the pad on home, then a deep and a high bowl together.
+    const home = { chord: 0, harmDepth: 0, swell: 0.6, phraseEnd: true };
+    setHarmony(g, home, t - 0.4, s);
+    parts = bowlVoice(ctx, out, midiToFreq(48 + root), t, 0.72, 0, 1.8)
+      .concat(bowlVoice(ctx, out, midiToFreq(60 + root), t + 0.04, 0.4, 0, 1.6));
+  }
+  const stop = Math.max(...parts.map((p) => p.stop));
+  return { start: t, stop, release() {}, cancel() { parts.forEach((p) => { try { p.o.stop(); } catch (e) { /* */ } }); }, dispose() { try { out.disconnect(); rev.disconnect(); } catch (e) { /* */ } } };
 }
 
 /** A single rain droplet: a tiny upward "plink", panned randomly. */

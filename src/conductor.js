@@ -7,7 +7,7 @@
  * ahead with a look-ahead scheduler; not-yet-sounding notes are cancelled on pause.
  */
 import { composeCycle, cyclePegs } from './recursion/composer.js';
-import { triggerMove, triggerDroplet, setDroneActive, fadeMaster, applySettings } from './audio/engine.js';
+import { performMove, performCue, triggerDroplet, setDroneActive, fadeMaster, applySettings } from './audio/engine.js';
 
 const TAIL = 8;
 
@@ -16,6 +16,8 @@ export class Conductor {
     this.graph = null;
     this.settings = null;
     this.events = [];
+    this.cues = []; // opening / final bowl strikes of each cycle
+    this.nextCue = 0;
     this.cycleCount = 0;
     this.playing = false;
     this.playhead = 0;
@@ -75,6 +77,7 @@ export class Conductor {
     this.settings = settings;
     const cycles = preserve ? Math.max(1, this.cycleCount) : 1;
     this.events = [];
+    this.cues = [];
     this.cycleCount = 0;
     for (let k = 0; k < cycles; k++) this.appendCycle();
     if (preserve && done > 0) {
@@ -103,8 +106,9 @@ export class Conductor {
     const k = this.cycleCount;
     const { from, to } = cyclePegs(s.from, s.to, k);
     const start = this.events.length ? this.endTime() : 0;
-    const evs = composeCycle({ ...s, from, to }, k, start, this.events.length);
-    this.events.push(...evs);
+    const { events, cues } = composeCycle({ ...s, from, to }, k, start, this.events.length);
+    this.events.push(...events);
+    this.cues.push(...cues);
     this.cycleCount++;
   }
 
@@ -112,7 +116,7 @@ export class Conductor {
     return cyclePegs(this.settings.from, this.settings.to, k);
   }
 
-  play({ silent = false, step = false } = {}) {
+  play({ silent = false, step = false, fade = 2 } = {}) {
     if (!this.graph) return;
     if (this.finished || (!this.settings.endless && this.playhead > this.endTime() + 1 && !step)) {
       this.restart({ autoplay: false });
@@ -120,12 +124,14 @@ export class Conductor {
     this.finished = false;
     this.clockStart = this.audioNow + 0.05 - this.playhead;
     this.nextIdx = this.completedAt(this.playhead);
+    this.nextCue = this.cues.findIndex((c) => c.time > this.playhead);
+    if (this.nextCue < 0) this.nextCue = this.cues.length;
     this.playing = true;
     if (!step) {
       this.stepStopAt = null;
-      setDroneActive(this.graph, true, this.audioNow, 3);
+      setDroneActive(this.graph, true, this.audioNow, 2); // 2 s fade-in of the musical bed
     }
-    fadeMaster(this.graph, 1, silent ? 0.4 : 1.5);
+    fadeMaster(this.graph, 1, silent ? 0.4 : fade);
     this.emit('play');
   }
 
@@ -149,6 +155,7 @@ export class Conductor {
     const was = this.playing || autoplay;
     this.pause({ silent: true });
     this.events = [];
+    this.cues = [];
     this.cycleCount = 0;
     this.appendCycle();
     this.playhead = 0;
@@ -193,14 +200,19 @@ export class Conductor {
       while (this.nextIdx < this.events.length && this.events[this.nextIdx].time <= Math.min(ph + lookahead, limit)) {
         const ev = this.events[this.nextIdx++];
         const at = Math.max(now + 0.01, this.clockStart + ev.time);
-        this.pending.push(triggerMove(this.graph, ev, at, this.settings));
+        performMove(this.graph, ev, at, this.settings, this.pending);
+      }
+      while (this.nextCue < this.cues.length && this.cues[this.nextCue].time <= Math.min(ph + lookahead, limit)) {
+        const cue = this.cues[this.nextCue++];
+        if (this.clockStart + cue.time < now - 0.5) continue; // skip cues we seeked past
+        this.pending.push(performCue(this.graph, cue, Math.max(now + 0.01, this.clockStart + cue.time), this.settings));
       }
       if (this.stepStopAt !== null && ph >= this.stepStopAt) {
         this.playhead = this.stepStopAt;
         this.playing = false;
         this.stepStopAt = null;
         this.emit('pause');
-      } else if (!this.settings.endless && ph > this.endTime() + TAIL) {
+      } else if (!this.settings.endless && ph > this.endTime() + TAIL + 4) {
         this.playhead = ph;
         this.playing = false;
         this.finished = true;

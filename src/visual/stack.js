@@ -61,7 +61,7 @@ export class StackView {
       .join('');
     this.stackEl.innerHTML = html;
     this.moveEl.innerHTML = showEv
-      ? `move stone <b>${showEv.stone}</b> ${PEG_NAMES[showEv.from]} → ${PEG_NAMES[showEv.to]} <span class="muted">· depth ${showEv.depth}</span>`
+      ? `move stone <b>${showEv.stone}</b> ${PEG_NAMES[showEv.from]} → ${PEG_NAMES[showEv.to]} <span class="muted">· depth ${showEv.depth}${showEv.phraseStart ? ' · asks' : showEv.phraseEnd ? ' · answers' : ''}</span>`
       : '<span class="muted">waiting at the river…</span>';
 
     // Ruler sequence

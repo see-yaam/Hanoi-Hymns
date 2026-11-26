@@ -284,7 +284,7 @@ $('#btn-export').addEventListener('click', async () => {
   const prog = $('#export-progress');
   try {
     const s = controls.s;
-    const blob = await renderWav(s, (phase, f) => {
+    const { blob } = await renderWav(s, (phase, f) => {
       $('#export-phase').textContent = phase;
       bar.style.transform = `scaleX(${f.toFixed(3)})`;
       prog.setAttribute('aria-valuenow', String(Math.round(f * 100)));
