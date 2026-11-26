@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Zen Stones — a calm riverside where the Tower of Hanoi recursion composes a soundscape, one singing stone at a time." />
+    <meta name="theme-color" content="#141a3a" />
+    <title>Zen Stones — Recursive Soundscapes</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23141a3a'/%3E%3Cellipse cx='32' cy='46' rx='20' ry='6' fill='%238b8279'/%3E%3Cellipse cx='32' cy='36' rx='14' ry='5.5' fill='%239d8569'/%3E%3Cellipse cx='32' cy='27' rx='8' ry='4.5' fill='%23b9a8e0'/%3E%3Ccircle cx='46' cy='14' r='4' fill='%23f2b36f'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <canvas id="scene" aria-hidden="true"></canvas>
+
+    <!-- Breathing guide -->
+    <div id="breath" class="breath" aria-hidden="true">
+      <div class="breath-circle"><span class="breath-label">Inhale</span></div>
+    </div>
+
+    <header class="brand ui">
+      <h1>Zen Stones</h1>
+      <p>recursive soundscapes</p>
+    </header>
+
+    <!-- Recursion panel -->
+    <section id="recursion" class="glass recursion ui" aria-label="Recursion view">
+      <div class="rec-head">
+        <h2>Recursion</h2>
+        <button id="rec-collapse" class="icon-btn small" aria-expanded="true" aria-controls="rec-body" aria-label="Collapse recursion view">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6" /></svg>
+        </button>
+      </div>
+      <div id="rec-body">
+        <ol id="stack-frames" class="frames" aria-label="Call stack"></ol>
+        <p id="stack-move" class="move"></p>
+        <div class="ruler-head">
+          <h3>Ruler sequence</h3>
+          <span class="muted tiny">the fractal rhythm</span>
+        </div>
+        <canvas id="ruler" aria-label="Bar chart of moved stone sizes forming the fractal ruler sequence" role="img"></canvas>
+        <p id="ruler-text" class="ruler-text" aria-label="Recent stones moved"></p>
+      </div>
+      <div id="progress" class="progress" role="progressbar" aria-label="Moves completed" aria-valuemin="0" aria-valuenow="0" aria-valuemax="31">
+        <div id="progress-bar"></div>
+      </div>
+      <p class="progress-row"><span id="progress-text">move 0 / 31</span><span id="cycle-text" class="muted"></span></p>
+    </section>
+
+    <!-- Transport -->
+    <nav class="transport glass ui" aria-label="Playback controls">
+      <button id="btn-restart" class="icon-btn" aria-label="Restart (R)" title="Restart (R)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" /><path d="M4 4v4.5h4.5" /></svg>
+      </button>
+      <button id="btn-back" class="icon-btn" aria-label="Step back (Left arrow)" title="Step back (←)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
+      </button>
+      <button id="btn-play" class="icon-btn play" aria-label="Play (Space)" title="Play / Pause (Space)">
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" class="fill" /></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5.5v13M15.5 5.5v13" /></svg>
+      </button>
+      <button id="btn-step" class="icon-btn" aria-label="Step forward (Right arrow)" title="Step forward (→)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+      </button>
+      <span class="sep" aria-hidden="true"></span>
+      <button id="btn-breath" class="icon-btn" aria-label="Breathing guide (B)" aria-pressed="false" title="Breathing guide (B)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="3" /></svg>
+      </button>
+      <button id="btn-focus" class="icon-btn" aria-label="Focus mode (F)" title="Focus mode (F)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>
+      </button>
+      <button id="btn-about" class="icon-btn" aria-label="About the math (?)" title="About the math (?)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6" /><path d="M12 17.2v.1" /></svg>
+      </button>
+    </nav>
+
+    <!-- Settings panel -->
+    <button id="panel-toggle" class="panel-toggle glass ui" aria-expanded="true" aria-controls="panel" title="Settings (S)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+      <span>Settings</span>
+    </button>
+    <aside id="panel" class="panel glass ui" aria-label="Soundscape settings">
+      <div class="panel-scroll">
+        <section aria-labelledby="h-presets">
+          <h2 id="h-presets">Presets</h2>
+          <div id="presets" class="presets" role="group" aria-label="Presets"></div>
+        </section>
+
+        <section aria-labelledby="h-comp">
+          <h2 id="h-comp">Composition</h2>
+          <label class="field">
+            <span class="lbl">Stones <output id="out-n" for="in-n">5</output></span>
+            <input id="in-n" type="range" min="3" max="8" step="1" aria-label="Number of stones" />
+          </label>
+          <label class="field">
+            <span class="lbl">Mood &amp; scale</span>
+            <select id="in-scale" aria-label="Mood and scale"></select>
+          </label>
+          <div class="row2">
+            <label class="field">
+              <span class="lbl">Root note</span>
+              <select id="in-root" aria-label="Root note"></select>
+            </label>
+            <label class="field">
+              <span class="lbl">Instruments</span>
+              <select id="in-voicing" aria-label="Peg to instrument preset"></select>
+            </label>
+          </div>
+          <fieldset class="field seg" id="in-pace">
+            <legend class="lbl">Breath pace</legend>
+            <label><input type="radio" name="pace" value="slow" /><span>Slow</span></label>
+            <label><input type="radio" name="pace" value="medium" /><span>Medium</span></label>
+            <label><input type="radio" name="pace" value="flow" /><span>Flow</span></label>
+          </fieldset>
+          <div class="row2">
+            <label class="field">
+              <span class="lbl">Start rock</span>
+              <select id="in-from" aria-label="Start peg"><option value="0">A · left</option><option value="1">B · middle</option><option value="2">C · right</option></select>
+            </label>
+            <label class="field">
+              <span class="lbl">Target rock</span>
+              <select id="in-to" aria-label="Target peg"><option value="0">A · left</option><option value="1">B · middle</option><option value="2">C · right</option></select>
+            </label>
+          </div>
+          <p id="voicing-legend" class="legend muted tiny"></p>
+          <label class="field">
+            <span class="lbl">Echo depth <output id="out-echo" for="in-echo"></output></span>
+            <input id="in-echo" type="range" min="0" max="1" step="0.01" aria-label="Echo depth: how much recursion depth adds reverb and delay" />
+          </label>
+          <div class="field">
+            <span class="lbl" id="lbl-seed">Seed</span>
+            <div class="seed-row">
+              <input id="in-seed" type="number" min="1" max="999999" step="1" inputmode="numeric" aria-labelledby="lbl-seed" />
+              <button id="btn-dice" class="chip" aria-label="Randomize seed" title="Randomize seed">🎲</button>
+            </div>
+          </div>
+          <label class="switch">
+            <input id="in-endless" type="checkbox" />
+            <span class="track" aria-hidden="true"></span>
+            <span>Endless journey <span class="muted tiny">— the tower keeps travelling</span></span>
+          </label>
+        </section>
+
+        <section aria-labelledby="h-amb">
+          <h2 id="h-amb">Atmosphere</h2>
+          <label class="field"><span class="lbl">🌧 Rain <output id="out-rain"></output></span><input id="in-rain" type="range" min="0" max="1" step="0.01" aria-label="Rain level" /></label>
+          <label class="field"><span class="lbl">🌊 River <output id="out-river"></output></span><input id="in-river" type="range" min="0" max="1" step="0.01" aria-label="River level" /></label>
+          <label class="field"><span class="lbl">🍃 Wind <output id="out-wind"></output></span><input id="in-wind" type="range" min="0" max="1" step="0.01" aria-label="Wind level" /></label>
+          <label class="field"><span class="lbl">〰 Drone <output id="out-drone"></output></span><input id="in-drone" type="range" min="0" max="1" step="0.01" aria-label="Drone level" /></label>
+          <label class="field"><span class="lbl">🌙 Dusk ↔ Night <output id="out-night"></output></span><input id="in-night" type="range" min="0" max="1" step="0.01" aria-label="Sky: dusk to night" /></label>
+          <label class="field"><span class="lbl">🔈 Master volume <output id="out-volume"></output></span><input id="in-volume" type="range" min="0" max="100" step="1" aria-label="Master volume" /></label>
+        </section>
+
+        <section aria-labelledby="h-calm">
+          <h2 id="h-calm">Calm tools</h2>
+          <label class="switch">
+            <input id="in-breath" type="checkbox" />
+            <span class="track" aria-hidden="true"></span>
+            <span>Breathing guide <span class="muted tiny">4 · 4 · 6</span></span>
+          </label>
+          <label class="field">
+            <span class="lbl">Sleep timer <output id="out-sleep" class="muted"></output></span>
+            <select id="in-sleep" aria-label="Sleep timer">
+              <option value="0">Off</option>
+              <option value="10">10 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30">30 minutes</option>
+            </select>
+          </label>
+          <button id="btn-focus2" class="wide">Enter focus mode <kbd>F</kbd></button>
+        </section>
+
+        <section aria-labelledby="h-keep">
+          <h2 id="h-keep">Share &amp; keep</h2>
+          <button id="btn-share" class="wide">🔗 Copy share link</button>
+          <button id="btn-export" class="wide primary">⬇ Download my soundscape</button>
+          <p id="export-note" class="muted tiny"></p>
+        </section>
+
+        <section aria-labelledby="h-keys" class="keys">
+          <h2 id="h-keys">Keyboard</h2>
+          <dl>
+            <div><dt><kbd>Space</kbd></dt><dd>play / pause</dd></div>
+            <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>step back / forward</dd></div>
+            <div><dt><kbd>R</kbd></dt><dd>restart</dd></div>
+            <div><dt><kbd>F</kbd></dt><dd>focus mode</dd></div>
+            <div><dt><kbd>B</kbd></dt><dd>breathing guide</dd></div>
+            <div><dt><kbd>S</kbd></dt><dd>settings panel</dd></div>
+            <div><dt><kbd>?</kbd></dt><dd>about the math</dd></div>
+          </dl>
+        </section>
+      </div>
+    </aside>
+
+    <!-- Landing -->
+    <div id="landing" class="landing" role="dialog" aria-modal="true" aria-labelledby="landing-title" aria-describedby="landing-tag">
+      <div class="landing-inner">
+        <div class="landing-stones" aria-hidden="true"><i></i><i></i><i></i></div>
+        <h1 id="landing-title">Zen Stones</h1>
+        <p id="landing-tag" class="tagline">Let the recursion carry the stones, and the river carry your thoughts.</p>
+        <button id="begin" class="begin">Begin</button>
+        <p class="hint">best with headphones · sound starts when you begin</p>
+      </div>
+    </div>
+
+    <!-- About the math -->
+    <dialog id="about" class="glass modal" aria-labelledby="about-title">
+      <form method="dialog" class="modal-close-form"><button class="icon-btn small" aria-label="Close">✕</button></form>
+      <h2 id="about-title">About the math</h2>
+      <p>The <b>Tower of Hanoi</b> asks: how do you move a tower of stones from one rock to another, one stone at a time, never placing a bigger stone on a smaller one?</p>
+      <p>The answer is beautifully <b>recursive</b>. To move <i>n</i> stones from A to C:</p>
+      <ol>
+        <li>move the top <i>n − 1</i> stones out of the way, A → B <span class="muted">(the same puzzle, just smaller)</span></li>
+        <li>move the biggest stone, A → C</li>
+        <li>move the <i>n − 1</i> stones back on top, B → C</li>
+      </ol>
+      <p>Each step calls itself on a smaller tower until only one stone is left. The moves double with every stone: <b>2<sup>n</sup> − 1</b> moves in total — 7 for three stones, 255 for eight.</p>
+      <h3>The fractal rhythm</h3>
+      <p>Write down which stone moves each time and you get the <b>ruler sequence</b>:</p>
+      <p class="seq">1 2 1 3 1 2 1 4 1 2 1 3 1 2 1 5 …</p>
+      <p>It looks like the marks on a ruler. Each block is two copies of the previous block joined by a new, larger number — the same pattern at every scale, a <b>fractal</b>. In Zen Stones that sequence <i>is</i> the melody and the rhythm: small high stones chime often, big low stones speak rarely, and after a big stone the river takes a longer breath.</p>
+      <h3>How you hear the recursion</h3>
+      <ul>
+        <li><b>Stone size → pitch</b>: the largest stone is the lowest note.</li>
+        <li><b>Destination rock → instrument & position</b>: left, centre, right.</li>
+        <li><b>Recursion depth → space</b>: deeper calls echo further away.</li>
+      </ul>
+    </dialog>
+
+    <!-- Export overlay -->
+    <div id="export-overlay" class="export-overlay" role="dialog" aria-modal="true" aria-labelledby="export-title" hidden>
+      <div class="glass export-card">
+        <div class="export-ring" aria-hidden="true"></div>
+        <h2 id="export-title">Rendering your soundscape</h2>
+        <p id="export-phase" class="muted">Composing the stones…</p>
+        <div class="progress big" role="progressbar" aria-label="Export progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="export-progress"><div id="export-bar"></div></div>
+        <p class="muted tiny">Breathe slowly — this takes a little while.</p>
+      </div>
+    </div>
+
+    <button id="focus-exit" class="focus-exit glass" aria-label="Exit focus mode (F or Escape)">Exit focus · F</button>
+    <div id="sleep-badge" class="sleep-badge glass ui" hidden></div>
+    <div id="toast" class="toast glass" role="status" aria-live="polite"></div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
