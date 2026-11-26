@@ -8,7 +8,7 @@ A calm riverside at dusk. River stones rest on three flat rocks in the water. A 
 Tower of Hanoi** carries them across, one by one — and every move rings a singing bowl, a kalimba
 or a warm pad. The recursion doesn't just *drive* the music: it **is** the music.
 
-![Hanoi Hymns — Morning Mist: the call stack at depth 2, the Sierpinski constellation in the sky](docs/screenshot-main.png)
+![Hanoi Hymns — Morning Mist: a stone mid-flight at call-stack depth 4, the Sierpinski constellation in the sky](docs/screenshot-main.png)
 
 | Deep Sleep (8 stones, move 102 / 255 on the Sierpinski path) | Mobile |
 |---|---|
