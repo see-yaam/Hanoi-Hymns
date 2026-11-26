@@ -1080,3 +1080,90 @@ Pause, Mute all, and auto-pause on a hidden tab all work. The build passes and i
 
 The `ai-logs/` hook updates are still uncommitted, as before.
 
+
+---
+
+## 🧑 Prompt 9 — 2026-11-26 16:21:35 (UTC+0600)
+
+
+
+<pasted_content id="49da">
+Docs-only fixes, do not change app behaviour:
+
+1. Rewrite ai-logs/README.md so it matches the files that actually exist:
+   - The whole project was built in ONE Claude Code session.
+   - `full-session-export.txt` = complete verbatim /export of that session (primary log,
+     from the first prompt to the latest).
+   - `early-session-export-1205.txt` = an earlier /export of the same session taken at 12:05
+     (kept as a checkpoint).
+   - `claude-code-log.md` = hook-based auto log of prompts/responses (once the hooks were active).
+   - `.chain_state.json` = hook counter, safe to ignore.
+   Remove all references to session-01.md / session-NN.md and replace "Zen Stones" with
+   "Hanoi Hymns" (mention once that it was originally called Zen Stones).
+
+2. Rename package.json "name" to "hanoi-hymns", update CLAUDE.md accordingly, and run
+   npm install so package-lock.json matches.
+
+3. The app is deployed on Vercel. In README.md replace the live demo placeholder with:
+   https://hanoi-hymns.vercel.app
+   Make it prominent near the top (e.g. a "Live demo" line right under the tagline).
+
+4. Run `npm run build` to confirm nothing broke.
+   Commit with "docs: fix ai-logs references, rename package, add live demo link".
+</pasted_content id="49da">
+
+## 🤖 Response 9 — 2026-11-26 16:22:27 (UTC+0600)
+
+<details><summary>Tool calls (2)</summary>
+
+- 🔧 **Bash** — Inspect ai-logs folder and working tree — `cd "/e/Academic/Zen Stones" && ls -la ai-logs/ && ls *.txt 2>/dev/null; git status --short; cat ai-logs/README.md`
+- 🔧 **Bash** — Check hook log coverage and package name references — `cd "/e/Academic/Zen Stones" && grep -n "^## 🧑 Prompt" ai-logs/claude-code-log.md | head -3 && grep -c "^## 🧑 Prompt" ai-logs/claude-code-log.md && grep -n "\"name\"" package.json && grep -n "call-and-return" CLAUDE.md README.md`
+
+</details>
+
+The hook log begins at 13:28 (9 prompts so far). Writing the new `ai-logs/README.md`:
+
+<details><summary>Tool calls (4)</summary>
+
+- 🔧 **Write** — file_path: E:\Academic\Zen Stones\ai-logs\README.md
+- 🔧 **Bash** — Rename package, sync lockfile, locate README demo line — `cd "/e/Academic/Zen Stones" && sed -i 's/"name": "call-and-return"/"name": "hanoi-hymns"/' package.json && sed -i 's/(npm package: `call-and-return`; formerly "Zen Stones")/(npm package: `hanoi-hymns`; formerly "Zen Stones")/' CLAUDE.md && np …
+- 🔧 **Read** — file_path: E:\Academic\Zen Stones\README.md
+- 🔧 **Grep** — pattern: GitHub Pages|session-01|session-NN|Zen Stones
+
+</details>
+
+The main README's "How AI was used" section also links to the nonexistent `session-01.md`, so I'll fix that link too while moving the live demo link up under the tagline:
+
+<details><summary>Tool calls (5)</summary>
+
+- 🔧 **Read** — file_path: E:\Academic\Zen Stones\README.md
+- 🔧 **Edit** — file_path: E:\Academic\Zen Stones\README.md
+- 🔧 **Edit** — file_path: E:\Academic\Zen Stones\README.md
+- 🔧 **Edit** — file_path: E:\Academic\Zen Stones\README.md
+- 🔧 **Bash** — Build, verify references, commit docs fixes — `cd "/e/Academic/Zen Stones" && npm run build 2>&1 | grep -iE "error|built" && grep -rn "session-01\|session-NN" README.md CLAUDE.md ai-logs/README.md; grep -n "Zen Stones" ai-logs/README.md README.md CLAUDE.md; git add ai-logs/README.md README.md CLAUDE …
+
+</details>
+
+The docs are fixed and committed as `docs: fix ai-logs references, rename package, add live demo link`. The build still passes and no app code changed.
+
+1. **`ai-logs/README.md`:**
+   - **One session:** it now says the whole project was built in one Claude Code session.
+   - **File table:** it lists `full-session-export.txt` (the primary, complete log), `early-session-export-1205.txt` (the 12:05 checkpoint), `claude-code-log.md` (the automatic hook log, which starts at 13:28 once the hooks became active) and `.chain_state.json` (safe to ignore).
+   - **Names:** all `session-01.md` / `session-NN.md` references are gone, and it says "Hanoi Hymns", mentioning once that it was originally called Zen Stones.
+   - I edited only this file in `ai-logs/` and didn't touch the logs themselves, since CLAUDE.md protects that folder.
+
+2. **Package:** the name is now `hanoi-hymns`. I updated the line in CLAUDE.md and ran `npm install`, so `package-lock.json` matches.
+
+3. **Live demo:** a prominent "▶ Live demo: hanoi-hymns.vercel.app" line sits right under the tagline, and the old placeholder is removed.
+
+**I also fixed one thing you didn't ask for:** the main README's "How AI was used" section linked to the nonexistent `ai-logs/session-01.md`. It now lists the real files and says the project was built in one session.
+
+Your latest hook-log updates (`claude-code-log.md`, `.chain_state.json`) are still uncommitted.
+
+
+---
+
+## 🧑 Prompt 10 — 2026-11-26 16:22:46 (UTC+0600)
+
+commit the ai-logs updates and push to GitHub
+
