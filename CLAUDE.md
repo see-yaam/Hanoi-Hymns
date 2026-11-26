@@ -18,12 +18,13 @@ Vite 6 + vanilla JS (ES modules) · Tone.js 15 · Canvas 2D. No frameworks, no 3
 `vite.config.js` uses `base: './'` (GitHub Pages ready). `npm run dev` / `npm run build`.
 
 ## Map
-- `src/recursion/hanoi.js` — recursive generator `{stone, from, to, depth, index, stack}`
-- `src/recursion/composer.js` — moves → timed, seeded, humanized events (fractal breath rhythm)
+- `src/recursion/hanoi.js` — recursive generator of `enter` / `move` / `return` events (depth + stack)
+- `src/recursion/composer.js` — call structure → score: harmony stack (call = question, return = answer), phrases, swell, cues
+- `src/audio/harmony.js` — consonant chord sets per mood, voice leading, chord-tone snapping
 - `src/audio/engine.js` — graph (bus → lowpass → comp → makeup → fader → −10 dB volume → limiter), voices, drone, ambience
 - `src/audio/export.js` — offline render (same graph) → 16-bit WAV
 - `src/conductor.js` — single clock: playhead from AudioContext time, look-ahead scheduler, step/pause/endless
-- `src/visual/scene.js` — canvas scene derived from the playhead every frame; `stack.js` — call stack + ruler panel
+- `src/visual/scene.js` — canvas scene derived from the playhead every frame; `stack.js` — call stack + ruler panel; `sierpinski.js` — 3^n state constellation
 - `src/ui/controls.js`, `src/settings.js` (scales, presets, URL-hash share), `src/main.js` (wiring, calm tools, keys)
 
 ## Audio rules (do not break)
