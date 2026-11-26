@@ -1167,3 +1167,68 @@ Your latest hook-log updates (`claude-code-log.md`, `.chain_state.json`) are sti
 
 commit the ai-logs updates and push to GitHub
 
+## 🤖 Response 10 — 2026-11-26 16:23:05 (UTC+0600)
+
+<details><summary>Tool calls (1)</summary>
+
+- 🔧 **Bash** — Check remote, branch and pending changes — `cd "/e/Academic/Zen Stones" && git remote -v && git branch -vv && git status --short`
+
+</details>
+
+The remote is set up and `main` is one commit ahead. The repo is public, so before committing I'll scan the log changes for anything secret-looking:
+
+<details><summary>Tool calls (2)</summary>
+
+- 🔧 **Bash** — Scan log changes for secrets before pushing — `cd "/e/Academic/Zen Stones" && git diff ai-logs/ | grep -inE "ghp_[A-Za-z0-9]{10}|github_pat_|sk-ant|sk-[A-Za-z0-9]{20}|AKIA[0-9A-Z]{12}|password\s*[=:]\s*[^[ ]|token\s*[=:]\s*[^[ ]" | grep -v "REDACTED" | head; echo "scan exit: done"`
+- 🔧 **Bash** — Commit log updates and push to GitHub — `cd "/e/Academic/Zen Stones" && git add ai-logs/.chain_state.json ai-logs/claude-code-log.md && git commit -q -m "docs: update prompt-chain logs ⏎  ⏎ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>" && git push origin main 2>&1 | tail -5 && git status  …
+
+</details>
+
+The log updates are committed and everything is pushed to https://github.com/see-yaam/Hanoi-Hymns. Before committing, I scanned the log changes for passwords and access keys and found none.
+
+Two commits went up: `docs: update prompt-chain logs` (the latest `claude-code-log.md` and `.chain_state.json`) and the earlier `docs: fix ai-logs references, rename package, add live demo link`. Local `main` now matches GitHub, with nothing left uncommitted.
+
+The hooks keep writing to `claude-code-log.md` after every prompt, including this one. So right before the deadline, commit and push once more, and re-run `/export` to `ai-logs/full-session-export.txt` so the log covers the whole session.
+
+
+---
+
+## 🧑 Prompt 11 — 2026-11-26 16:23:43 (UTC+0600)
+
+update the README screenshots from the live Vercel site
+
+## 🤖 Response 11 — 2026-11-26 16:25:25 (UTC+0600)
+
+I'll capture the same three shots as before (desktop Morning Mist with a stone mid-flight, Deep Sleep with the 8-stone constellation, and mobile), this time from the live site. Checking memory first:
+
+<details><summary>Tool calls (2)</summary>
+
+- 🔧 **PowerShell** — Check memory and that the live site responds — `$os = Get-CimInstance Win32_OperatingSystem; "{0:N1} GB free" -f ($os.FreePhysicalMemory/1MB); try { $r = Invoke-WebRequest -UseBasicParsing https://hanoi-hymns.vercel.app -TimeoutSec 15; "$($r.StatusCode) " + ([regex]::Match($r.Content, '<title>[^<]*< …
+- 🔧 **Bash** — Retry fetching the live site with curl — `curl -s -o /dev/null -m 30 -w "%{http_code} %{time_total}s\n" https://hanoi-hymns.vercel.app/ ; curl -s -m 30 https://hanoi-hymns.vercel.app/ | grep -o "<title>[^<]*</title>"`
+
+</details>
+
+The live site didn't respond from this machine: no HTTP code after 21 s. Checking whether it's DNS or the connection:
+
+<details><summary>Tool calls (1)</summary>
+
+- 🔧 **Bash** — Diagnose DNS and connection to Vercel — `nslookup hanoi-hymns.vercel.app 2>&1 | tail -4; curl -sv -m 15 -o /dev/null https://hanoi-hymns.vercel.app/ 2>&1 | grep -E "Trying|Connected|SSL|HTTP/|timed out|Could not|Failed" | head -8; curl -s -o /dev/null -m 15 -w "github: %{http_code}\n" https://github …
+
+</details>
+
+I can't reach the live site from this machine. `hanoi-hymns.vercel.app` resolves fine (to 64.29.17.67 / 216.198.79.67), but every HTTPS connection to those Vercel servers times out after 15–21 s. GitHub loads normally, so the network is working; this connection (likely your ISP or network) just isn't reaching Vercel's servers. I haven't changed any screenshots.
+
+Two ways forward:
+
+1. **Screenshot the production build locally (my recommendation).** I'd run `npm run build` plus `vite preview`, which serves the same `dist/` output Vercel deploys from commit `d8faa9a`, and take the same three shots. The images would look identical to the live site, as long as Vercel deployed that commit.
+2. **You take them in your own browser,** if the site opens there (a VPN or mobile hotspot often helps when an ISP blocks Vercel). Save them over `docs/screenshot-main.png`, `docs/screenshot-night.png` and `docs/screenshot-mobile.png`; I can crop or resize them and commit.
+
+Should I go with option 1?
+
+
+---
+
+## 🧑 Prompt 12 — 2026-11-26 16:25:46 (UTC+0600)
+
+go with option 1, then commit and push
+
