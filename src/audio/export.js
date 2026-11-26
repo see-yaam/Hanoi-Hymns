@@ -41,7 +41,7 @@ export async function renderWav(settings, onProgress = () => {}, { limit = Infin
   // Tone.Offline exposes no render progress, so estimate it from a measured
   // speed and ease the bar toward 90 % until rendering resolves.
   const started = performance.now();
-  const expectedMs = 1500 + duration * 260; // measured ≈ 3–4× faster than real time
+  const expectedMs = 2000 + duration * 550; // measured: ≈ 35 s to render 60 s on a busy laptop
   let rendering = true;
   const timer = setInterval(() => {
     if (!rendering) return;
